@@ -81,6 +81,11 @@ function PosWorkspace({ user, outletId }: { user: User; outletId: string }) {
                 <AlertDescription>{phase.message}</AlertDescription>
               </Alert>
             )}
+            {phase.kind === 'notice' && (
+              <Alert data-print-hide>
+                <AlertDescription>{phase.message}</AlertDescription>
+              </Alert>
+            )}
             <CartPanel
               lines={lines}
               submitting={submitting}

@@ -1,3 +1,4 @@
+import { reportKeys } from '@/features/reports/hooks/report-query-keys';
 import { keepPreviousData, type QueryClient, useQuery } from '@tanstack/react-query';
 import { inventoryKeys } from '@/features/inventory/hooks/inventory-query-keys';
 import { outletMenuKeys } from '@/features/outlet-menu-items/hooks/outlet-menu-query-keys';
@@ -27,5 +28,6 @@ export async function syncCompletedSale(queryClient: QueryClient, sale: Sale): P
     queryClient.invalidateQueries({ queryKey: salesKeys.lists(sale.outletId) }),
     queryClient.invalidateQueries({ queryKey: outletMenuKeys.outlet(sale.outletId) }),
     queryClient.invalidateQueries({ queryKey: inventoryKeys.outlet(sale.outletId) }),
+    queryClient.invalidateQueries({ queryKey: reportKeys.all }),
   ]);
 }

@@ -75,4 +75,14 @@ describe('cart store', () => {
     expect(line).toMatchObject({ unitPrice: '260.00', quantity: 3 });
     expect(line && lineNeedsReview(line)).toBe(false);
   });
+
+  it('restores submitted lines only into an empty cart', () => {
+    const key = cartKey('user', 'outlet');
+    const restored = { ...product, quantity: 3, availableStock: 3 };
+    useCartStore.getState().restore(key, [restored]);
+    expect(useCartStore.getState().carts[key]).toEqual([restored]);
+
+    useCartStore.getState().restore(key, [{ ...restored, quantity: 9 }]);
+    expect(useCartStore.getState().carts[key]?.[0]?.quantity).toBe(3);
+  });
 });

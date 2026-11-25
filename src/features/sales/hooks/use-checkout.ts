@@ -23,17 +23,21 @@ export type CheckoutPhase =
   | { kind: 'submitting' }
   | { kind: 'uncertain'; message: string }
   | { kind: 'rejected'; message: string }
+  | { kind: 'notice'; message: string }
   | { kind: 'completed'; sale: Sale; replayed: boolean };
 
-const UNCERTAIN_KINDS = new Set<ApiError['kind']>([
-  'network',
-  'timeout',
-  'server',
-  'unknown',
-  'canceled',
-  'rate_limited',
-]);
 const CORRECTABLE_CODES = new Set(['PRICE_CHANGED', 'INSUFFICIENT_STOCK', 'ITEM_UNAVAILABLE']);
+const CONCLUSIVE_CODES = new Set([
+  ...CORRECTABLE_CODES,
+  'SALE_TOTAL_LIMIT_EXCEEDED',
+  'RECEIPT_LIMIT_EXCEEDED',
+  'IDEMPOTENCY_CONFLICT',
+]);
+
+export const STORAGE_FAILURE_MESSAGE =
+  'This browser could not save the checkout safely, so the sale was not sent. Your cart is unchanged. Allow site storage or leave private browsing, then confirm the sale again.';
+export const DISCARD_NOTICE =
+  'The unconfirmed sale was discarded and the cart was cleared. Check Sales history before ringing up the same items again.';
 
 const REJECTION_MESSAGES: Record<string, string> = {
   PRICE_CHANGED: 'Some prices changed. Review the highlighted items, then confirm the sale again.',
@@ -41,13 +45,36 @@ const REJECTION_MESSAGES: Record<string, string> = {
   ITEM_UNAVAILABLE: 'Some items are no longer available. Remove the highlighted items.',
   OUTLET_INACTIVE: 'This outlet is inactive, so sales cannot be completed.',
   IDEMPOTENCY_CONFLICT:
-    'This checkout could not be matched to the original sale. Start the sale again.',
+    'This checkout could not be matched to the original sale. Review the cart and confirm it as a new sale.',
   SALE_TOTAL_LIMIT_EXCEEDED: 'The sale total is too large. Split it into smaller sales.',
   RECEIPT_LIMIT_EXCEEDED: 'This outlet has reached its receipt number limit. Contact HQ.',
 };
 
 const UNCERTAIN_MESSAGE =
   'We could not confirm whether this sale was completed. It may already be recorded. Check its status, or retry the same sale — retrying never charges twice.';
+
+function isConclusiveRejection(error: ApiError): boolean {
+  return (
+    error.kind === 'validation' || (error.code !== undefined && CONCLUSIVE_CODES.has(error.code))
+  );
+}
+
+function unresolvedMessage(error: ApiError): string {
+  if (error.code === 'OUTLET_INACTIVE') {
+    return 'This outlet is inactive, so the sale was not completed. Keep this checkout until its status is confirmed, or discard it.';
+  }
+  switch (error.kind) {
+    case 'unauthenticated':
+    case 'session_expired':
+      return 'Your session ended before the sale was confirmed. Sign in again, then check its status.';
+    case 'forbidden':
+      return 'Access to this outlet was refused while confirming the sale. Check its status, or ask HQ to restore your access.';
+    case 'rate_limited':
+      return 'Too many requests right now. Wait a moment, then check the status or retry the same sale.';
+    default:
+      return UNCERTAIN_MESSAGE;
+  }
+}
 
 function toConflicts(error: ApiError): CartConflict[] {
   return error.fieldErrors.flatMap(({ meta }): CartConflict[] => {
@@ -68,6 +95,7 @@ export function useCheckout(userId: string, outletId: string) {
   const key = cartKey(userId, outletId);
   const applyConflicts = useCartStore((state) => state.applyConflicts);
   const clearCart = useCartStore((state) => state.clear);
+  const restoreCart = useCartStore((state) => state.restore);
   const [pending, setPending] = useState<PendingCheckout | null>(() =>
     loadPendingCheckout(userId, outletId),
   );
@@ -107,11 +135,15 @@ export function useCheckout(userId: string, outletId: string) {
         await complete(result.sale, result.replayed);
       } catch (error) {
         const apiError = normalizeApiError(error);
-        if (UNCERTAIN_KINDS.has(apiError.kind) || apiError.code === 'CONCURRENT_UPDATE') {
-          setPhase({ kind: 'uncertain', message: UNCERTAIN_MESSAGE });
+        if (!isConclusiveRejection(apiError)) {
+          setPhase({ kind: 'uncertain', message: unresolvedMessage(apiError) });
           return;
         }
         finishPending();
+        restoreCart(
+          key,
+          request.lines.map((line) => ({ ...line, availableStock: line.quantity })),
+        );
         if (apiError.code && CORRECTABLE_CODES.has(apiError.code)) {
           applyConflicts(key, toConflicts(apiError));
           await queryClient.invalidateQueries({ queryKey: outletMenuKeys.outlet(outletId) });
@@ -124,7 +156,7 @@ export function useCheckout(userId: string, outletId: string) {
         inFlight.current = false;
       }
     },
-    [applyConflicts, complete, finishPending, key, outletId, queryClient],
+    [applyConflicts, complete, finishPending, key, outletId, queryClient, restoreCart],
   );
 
   const confirm = useCallback(
@@ -141,7 +173,10 @@ export function useCheckout(userId: string, outletId: string) {
           unitPrice,
         })),
       };
-      savePendingCheckout(userId, outletId, request);
+      if (!savePendingCheckout(userId, outletId, request)) {
+        setPhase({ kind: 'rejected', message: STORAGE_FAILURE_MESSAGE });
+        return;
+      }
       setPending(request);
       await submit(request);
     },
@@ -174,9 +209,11 @@ export function useCheckout(userId: string, outletId: string) {
   }, [complete, outletId, pending]);
 
   const discard = useCallback(() => {
+    if (inFlight.current) return;
     finishPending();
-    setPhase({ kind: 'idle' });
-  }, [finishPending]);
+    clearCart(key);
+    setPhase({ kind: 'notice', message: DISCARD_NOTICE });
+  }, [clearCart, finishPending, key]);
 
   const reset = useCallback(() => setPhase({ kind: 'idle' }), []);
 

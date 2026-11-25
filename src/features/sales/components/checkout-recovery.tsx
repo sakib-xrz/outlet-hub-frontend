@@ -80,8 +80,9 @@ export function CheckoutRecovery({
           <AlertDialogHeader>
             <AlertDialogTitle>Discard the unconfirmed sale?</AlertDialogTitle>
             <AlertDialogDescription>
-              If the original request was already completed, it stays recorded and will appear in
-              the sales history. Check its status first if you are unsure.
+              The cart will be emptied so these items are not sent again by accident as a new sale.
+              If the original request was already completed, it stays recorded and appears in the
+              sales history. Check its status first if you are unsure.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

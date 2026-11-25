@@ -32,6 +32,7 @@ type CartState = {
   clear: (key: string) => void;
   applyConflicts: (key: string, conflicts: CartConflict[]) => void;
   acceptPrice: (key: string, menuItemId: string) => void;
+  restore: (key: string, lines: CartLine[]) => void;
 };
 
 export const cartKey = (userId: string, outletId: string): string => `${userId}:${outletId}`;
@@ -131,6 +132,13 @@ export const useCartStore = create<CartState>()((set) => ({
         }),
       },
     })),
+
+  restore: (key, lines) =>
+    set(({ carts }) =>
+      carts[key]?.length
+        ? { carts }
+        : { carts: { ...carts, [key]: lines.map((line) => ({ ...line })) } },
+    ),
 }));
 
 export function lineNeedsReview(line: CartLine): boolean {

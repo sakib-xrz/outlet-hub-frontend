@@ -92,7 +92,7 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 | ---------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
 | `/`                                | none                                         | Sends you to `/dashboard` or `/login` based on auth state |
 | `/login`                           | `PublicRoute`                                | Lazy auth layout and page                                 |
-| `/dashboard`                       | `ProtectedRoute` → `RoleGuard`               | Lazy app shell and page                                   |
+| `/dashboard`                       | `ProtectedRoute` → `RoleGuard`               | Role-aware: HQ reports, or a staff outlet launcher        |
 | `/outlets`                         | `ProtectedRoute` → `RoleGuard`               | Outlet list; filters, sort and page live in the URL       |
 | `/outlets/:outletId/pos`           | `ProtectedRoute` → `RoleGuard(OUTLET_STAFF)` | Point of sale                                             |
 | `/outlets/:outletId/sales`         | `ProtectedRoute` → `RoleGuard`               | Sales history                                             |
@@ -390,17 +390,18 @@ The code lives in `src/features/sales/`, with pages `outlet-pos-page.tsx`, `outl
 **Checkout and idempotency** (`hooks/use-checkout.ts`):
 
 1. _Checkout_ opens a confirmation showing the total.
-2. On confirm, a `crypto.randomUUID()` request id is generated. The frozen payload (lines with their expected prices) is saved to `sessionStorage` under `outlethub:pending-sale:<userId>:<outletId>` before the single `POST`. Only ids, names, quantities and prices are stored, never tokens.
+2. On confirm, a `crypto.randomUUID()` request id is generated. The frozen payload (lines with their expected prices) is saved to `sessionStorage` under `outlethub:pending-sale:<userId>:<outletId>` before the single `POST`. Only ids, names, quantities and prices are stored, never tokens. **If that save fails** (private mode, quota or blocked storage), the sale is **not sent**. An actionable error appears, the cart is kept, and the cashier can confirm again once storage works.
 3. Double submission is prevented by a busy state, disabled buttons and an in-flight guard. Checkout mutations are never retried automatically.
 4. **Success** (201 new or 200 replay): the pending request is cleared, the cart emptied and the receipt shown. The sale detail is cached, and that outlet's menu, inventory and sales queries are invalidated.
-5. **Uncertain outcome** (network, timeout, 5xx, rate limit or `CONCURRENT_UPDATE`):
+5. **Unresolved outcome**: anything that is not a conclusive pre-commit rejection. That includes network errors, timeouts, 5xx, 401/session end, 403, 429, `OUTLET_INACTIVE`, `CONCURRENT_UPDATE` and unknown codes:
    - The cart and the frozen request stay locked; they can't be edited into a different payload under the same id.
-   - The recovery panel explains the sale may already be recorded. It offers **Check sale status** (`GET …/by-request/:requestId`), **Retry same sale** (the same id and payload) and **Discard** (with a warning).
+   - The recovery panel shows a message for the specific cause (sign in again, access refused, wait and retry, outlet inactive, or possibly recorded). It offers **Check sale status** (`GET …/by-request/:requestId`), **Retry same sale** (the same id and payload) and **Discard**. The pending request is kept through every such retry.
+   - **Discard** warns first. It then clears the pending request **and the cart**, so the same items can't be silently resubmitted under a new id. A notice tells the cashier to check Sales history before ringing them up again.
    - A 404 from check-status says "not found yet" and suggests retrying the same sale.
 6. **Page reload:** a stored pending request opens straight into the recovery panel. It is **never** resubmitted automatically.
-7. **Definitive rejections:**
-   - **`PRICE_CHANGED`, `INSUFFICIENT_STOCK` or `ITEM_UNAVAILABLE`:** the pending request is cleared and the cart kept. Each affected line is marked ("Price changed ৳250.00 → ৳260.00", with an _Accept new price_ button; "Only 1 available"; "No longer available"), and the catalog is refreshed. Checkout stays disabled until every flag is resolved. The next confirmation uses a **new** request id.
-   - **Other rejections** (`IDEMPOTENCY_CONFLICT`, `OUTLET_INACTIVE`, limits, 403) clear the pending request and show a message.
+7. **Conclusive rejections** (evaluated before anything is written: `PRICE_CHANGED`, `INSUFFICIENT_STOCK`, `ITEM_UNAVAILABLE`, `SALE_TOTAL_LIMIT_EXCEEDED`, `RECEIPT_LIMIT_EXCEEDED`, `IDEMPOTENCY_CONFLICT` and 400 validation):
+   - The pending request is cleared. The submitted lines go back into the cart, which matters after a reload when the in-memory cart is empty, so the cashier can correct them. The next confirmation uses a **new** request id.
+   - **Correctable codes** (price, stock, availability): each affected line is marked ("Price changed ৳250.00 → ৳260.00", with an _Accept new price_ button; "Only 1 available"; "No longer available"), and the catalog is refreshed. Checkout stays disabled until every flag is resolved.
 
 **Receipt:**
 
@@ -426,9 +427,68 @@ The code lives in `src/features/sales/`, with pages `outlet-pos-page.tsx`, `outl
 - a price change requiring acceptance and a new request id;
 - insufficient-stock correction;
 - the idempotency conflict;
+- a failed pending-checkout save (no POST, cart kept, retry works);
+- 403, 429, `OUTLET_INACTIVE`, `CONCURRENT_UPDATE` and 500 retries keeping the pending request;
+- a conclusive rejection after reload restoring the cart and using a new id;
+- discard clearing the pending request and the cart without sending anything;
 - POS role restriction and the details actions;
 - receipt snapshot rendering and printing;
 - history listing, search, pagination and states.
+
+## Dashboard and reports
+
+The code lives in `src/features/reports/`, with the page `src/pages/dashboard/dashboard-page.tsx`.
+
+**HQ administrators** see company reporting:
+
+- **Key figures:**
+  - total revenue, sales and units sold for the period;
+  - active outlets as "4 of 5", labelled as current status rather than a figure for the period.
+- **Revenue by outlet:**
+  - A paginated table (10 per page) with code, name, status, sales and revenue. It includes inactive and zero-sale outlets.
+  - A CSS bar chart of the **current page only**, captioned as such.
+  - _Top items_ on a row selects that outlet below.
+- **Top 5 items:**
+  - A searchable outlet selector, with inactive outlets allowed and _Load more_ paging.
+  - It defaults to the outlet leading the revenue table.
+  - Rank, current name and SKU, quantity and revenue, plus empty, error and 404 states.
+- **Period controls**, shared by every section:
+  - Presets: Today, Last 7 days, Last 30 days (default), This month, All time, and Custom (inclusive start and end dates).
+  - The selected period is shown in words.
+  - A **Refresh** button invalidates every report query.
+  - There is no polling.
+
+**Outlet staff** see an operational launcher: one card per accessible outlet with links to POS, sales history, menu and inventory. No `/reports` request is made, and no company figures are shown.
+
+**Date ranges** (`utils/report-range.ts`):
+
+- Boundaries are **local calendar midnights**. The end is **exclusive**: the next local midnight, never `23:59:59`. Both are sent as UTC ISO instants.
+- "This month" runs from the 1st to the 1st of the next month. A custom range ends at midnight after the chosen end date.
+- Custom ranges are validated against real calendar dates, end ≥ start and at most 366 days. An invalid custom range in the URL falls back to the default.
+- `period`, `from`/`to` (custom only, `YYYY-MM-DD`), `page` and `outlet` live in the URL, with defaults omitted. Changing the period resets the page.
+
+**Data:**
+
+- Query keys are `reportKeys.all`, `summary(range)`, `revenueByOutlet(range, { page })` and `topSelling(outletId, range)`.
+- Responses are Zod-validated:
+  - aggregate money must match `^\d+\.\d{2}$`, with no upper bound;
+  - counts must match `^\d+$`.
+- Values are displayed from those exact strings, with grouping done on strings only.
+- `Number()` is used only to compute bar widths.
+- A confirmed sale (`syncCompletedSale`) invalidates `reportKeys.all`, so returning to the dashboard shows fresh totals.
+
+**Tests:** `tests/unit/reports/` covers:
+
+- preset boundaries at local midnight with exclusive ends;
+- month and year rollover;
+- custom validation and fallback;
+- exact KPI strings beyond 2^53;
+- table and chart rows including inactive and zero outlets;
+- top-items selection, including an inactive outlet and an empty result;
+- presets and custom ranges in the URL and request params;
+- refresh, summary error and retry;
+- report invalidation after a sale;
+- the staff launcher making no report requests.
 
 ## Authentication
 
