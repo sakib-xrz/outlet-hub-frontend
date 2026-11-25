@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2) and **Master Menu Management** (phase 3). Outlet menu assignment, inventory, sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3) and **Outlet Menu Assignment & Price Overrides** (phase 4). Inventory, sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -94,6 +94,7 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 | `/login`                  | `PublicRoute`                            | Lazy auth layout and page                                 |
 | `/dashboard`              | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
 | `/outlets`                | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId/menu` | `ProtectedRoute` → `RoleGuard`           | Outlet menu (HQ manages; staff view)                      |
 | `/outlets/:outletId`      | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
 | `/staff`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
 | `/staff/:staffId`         | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
@@ -242,6 +243,64 @@ The code lives in `src/features/menu-items/`, with pages in `src/pages/menu-item
   - exact formatting.
 
 **Phase 3 fix:** the staff password-reset success toast used to say the staff member was "signed out of all sessions". It now says refresh sessions were revoked and that access already granted may last up to 15 minutes, which matches the backend.
+
+## Outlet menu
+
+The route is `/outlets/:outletId/menu`. It is reached from the outlet details page: **Manage menu** for HQ admins, **View menu** for staff. The code lives in `src/features/outlet-menu-items/` and `src/pages/outlets/outlet-menu-page.tsx`. Both roles can open the route. The backend scopes staff to their active outlets and enabled items, and the page shows "No access to this outlet" on 403.
+
+**HQ view:**
+
+- Columns: SKU, item, base price, override (`—` when inherited), effective price labelled _Master price_ or _Outlet price_, stock (read-only), availability, and actions.
+- Availability gives the most specific reason, in this order: _Outlet inactive_, _Master item inactive_, _Assignment inactive_, _Out of stock_, _Available_.
+- Search, assignment-status filter, sort and pagination are kept in the URL.
+
+**Staff view:** the same list without management columns, actions or the status filter. It shows only enabled items, with effective price, stock and _Out of stock_.
+
+**Assign menu item dialog:**
+
+- A searchable, server-paged picker (`useInfiniteQuery`, _Load more_) over **active** master items only. The selected item is held in its own state, so a background refetch or a new search doesn't drop it.
+- Pricing mode is either "Use master menu price" (the default) or "Set custom outlet price", with a live effective-price preview.
+- The server decides uniqueness: an already-assigned or inactive-assignment conflict (409) is shown under the picker. The full catalog and existing assignments are never loaded to pre-check.
+- The button is disabled while saving and for inactive outlets.
+
+**Price dialog:**
+
+- Shows the master price and the current effective price.
+- Offers the same two modes. The custom price is a decimal string (`inputMode="decimal"`, never a number), and `0` is allowed.
+- Choosing "Use master menu price" sends `null` and explains that future master price changes will apply. _Restore master price_ opens the dialog with that mode preselected.
+
+**Status dialog:**
+
+- **Deactivating** explains that the item is unavailable in this outlet only, other outlets are unaffected, stock and the custom price are kept, and past sales are unchanged.
+- **Reactivating** confirms that stock is kept. It is disabled, with the reason shown, while the outlet or master item is inactive.
+- There are no delete or stock controls.
+
+**Cache:**
+
+- Query keys: `outletMenuKeys.all` (`['outlet-menu']`), `outlet(id)`, `lists(id)`, `list(id, filters)`, `details(id)` and `detail(id, menuItemId)`.
+- Assignment mutations write `detail` and invalidate that outlet's lists.
+- **Cross-module dependencies:**
+  - A master-menu create, edit or status change invalidates every outlet menu, because base prices, names and master status flow into them.
+  - An outlet status change invalidates that outlet's menu.
+  - Logout already clears the whole cache.
+
+**Tests:** `tests/unit/outlet-menu/` covers:
+
+- price-source and availability labels;
+- loading, empty, error and retry states;
+- debounced search and pagination;
+- assigning with inherited and zero prices;
+- duplicate-submit prevention;
+- conflict display;
+- selection persisting through a refetch;
+- the inactive-outlet block;
+- restoring master pricing (`null`);
+- decimal validation;
+- deactivation and blocked reactivation;
+- the staff view and links;
+- the 403 state;
+- route access;
+- master-menu and outlet-status cache invalidation.
 
 ## Authentication
 
@@ -441,5 +500,7 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - After a password reset, the staff member's existing access token works until it expires (up to 15 minutes). After reactivation, an unexpired token from before the deactivation works again. There is no access-token denylist.
 - Staff accounts have only an email. The schema has no name or phone fields.
 - Money is displayed in BDT (`৳`) as a fixed single-currency convention. There is no locale-specific currency formatting.
+- Stock is shown read-only. Inventory adjustment arrives in a later phase.
+- The outlet menu can't be sorted by effective price, because that needs a database-computed column to page correctly.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

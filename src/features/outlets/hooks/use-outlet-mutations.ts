@@ -1,4 +1,5 @@
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+import { outletMenuKeys } from '@/features/outlet-menu-items/hooks/outlet-menu-query-keys';
 import { outletKeys } from '@/features/outlets/hooks/outlet-query-keys';
 import { outletService } from '@/features/outlets/services/outlet.service';
 import type {
@@ -34,6 +35,10 @@ export function useUpdateOutletStatus(outletId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (isActive: boolean) => outletService.setStatus(outletId, isActive),
-    onSuccess: (outlet) => syncOutlet(queryClient, outlet),
+    onSuccess: (outlet) =>
+      Promise.all([
+        syncOutlet(queryClient, outlet),
+        queryClient.invalidateQueries({ queryKey: outletMenuKeys.outlet(outlet.id) }),
+      ]).then(() => undefined),
   });
 }

@@ -1,4 +1,12 @@
-import { ArrowLeft, FileQuestion, Pencil, Power, PowerOff, ShieldAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  FileQuestion,
+  Pencil,
+  Power,
+  PowerOff,
+  ShieldAlert,
+  UtensilsCrossed,
+} from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { PageContainer } from '@/components/layout/page-container';
@@ -95,21 +103,29 @@ export function OutletDetailsPage() {
       title={data.name}
       description={`Outlet ${data.code}`}
       actions={
-        canManage && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setDialog('edit')}>
-              <Pencil aria-hidden />
-              Edit
-            </Button>
-            <Button
-              variant={data.isActive ? 'destructive' : 'default'}
-              onClick={() => setDialog('status')}
-            >
-              {data.isActive ? <PowerOff aria-hidden /> : <Power aria-hidden />}
-              {data.isActive ? 'Deactivate' : 'Activate'}
-            </Button>
-          </div>
-        )
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to={`/outlets/${data.id}/menu`}>
+              <UtensilsCrossed aria-hidden />
+              {canManage ? 'Manage menu' : 'View menu'}
+            </Link>
+          </Button>
+          {canManage && (
+            <>
+              <Button variant="outline" onClick={() => setDialog('edit')}>
+                <Pencil aria-hidden />
+                Edit
+              </Button>
+              <Button
+                variant={data.isActive ? 'destructive' : 'default'}
+                onClick={() => setDialog('status')}
+              >
+                {data.isActive ? <PowerOff aria-hidden /> : <Power aria-hidden />}
+                {data.isActive ? 'Deactivate' : 'Activate'}
+              </Button>
+            </>
+          )}
+        </div>
       }
     >
       <BackLink />
