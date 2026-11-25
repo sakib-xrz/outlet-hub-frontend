@@ -51,7 +51,7 @@ const REJECTION_MESSAGES: Record<string, string> = {
 };
 
 const UNCERTAIN_MESSAGE =
-  'We could not confirm whether this sale was completed. It may already be recorded. Check its status, or retry the same sale — retrying never charges twice.';
+  'We could not confirm whether this sale was completed. It may already be recorded. Check its status, or retry the same sale — a retry with the same request is never recorded twice.';
 
 function isConclusiveRejection(error: ApiError): boolean {
   return (

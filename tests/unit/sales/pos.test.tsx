@@ -166,6 +166,8 @@ describe('checkout', () => {
     expect(
       await screen.findByText(/could not confirm whether this sale was completed/),
     ).toBeInTheDocument();
+    expect(screen.getByText(/never recorded twice/)).toBeInTheDocument();
+    expect(screen.queryByText(/charge/i)).not.toBeInTheDocument();
     expect(posts(requests)).toHaveLength(1);
     const stored = JSON.parse(sessionStorage.getItem(PENDING_KEY) ?? '{}') as { requestId: string };
     expect(stored.requestId).toBe(posts(requests)[0]?.requestId);

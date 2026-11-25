@@ -1,6 +1,19 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3), **Outlet Menu Assignment & Price Overrides** (phase 4), **Inventory Management** (phase 5) and **POS Sales & Receipts** (phase 6). Reporting is not implemented yet. sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains:
+
+- the platform layer: authentication, routing, API and state infrastructure, design system, application shell and tooling;
+- **Outlet Management**;
+- **Staff & Outlet Membership Management**;
+- **Master Menu Management**;
+- **Outlet Menu Assignment & Price Overrides**;
+- **Inventory Management**;
+- **POS Sales & Receipts**;
+- a role-aware **Dashboard with revenue reporting**.
+
+OutletHub records sales; it does not process payments.
+
+**Architecture, scaling, microservices and offline POS/KDS proposals:** [backend `docs/ARCHITECTURE.md`](../backend/docs/ARCHITECTURE.md). **Executed verification:** [backend `docs/VERIFICATION.md`](../backend/docs/VERIFICATION.md).
 
 ## Stack
 
@@ -584,7 +597,7 @@ All auth responses are validated with Zod (`features/auth/schemas`). If the cont
 pnpm test
 ```
 
-There are 65 tests in 8 files:
+`pnpm test` runs the Vitest suites in `tests/unit/` (see `docs/VERIFICATION.md` for the current count). The original platform tests in that suite cover:
 
 - environment validation;
 - error normalization;
@@ -596,6 +609,25 @@ There are 65 tests in 8 files:
 - the login form: validation, normalization, duplicate-submit prevention, invalid credentials, server field errors, password toggle.
 
 All HTTP traffic is mocked. `tests/setup.ts` replaces Axios's default adapter so that any request a test forgets to mock fails immediately. Tests never contact the backend or the database.
+
+### Browser end-to-end tests (Playwright, real backend and real PostgreSQL)
+
+`e2e/business-flow.spec.ts` drives Chromium through the essential flows **without any mocked API**. `playwright.config.ts` starts the real backend (`../backend`, port 3100) and the Vite dev server (port 5174), connected to a **local, disposable, migrated** PostgreSQL. The config refuses any non-local database URL.
+
+1. Signed-out access to `/dashboard` redirects to login.
+2. HQ signs in and sees the dashboard. Through the UI, HQ creates an outlet and two menu items, assigns them to the outlet, adds stock, and creates a staff account assigned to the outlet.
+3. Staff signs in and sees the outlet launcher with no company reports. Staff opens the POS, builds a 2 + 1 multi-item cart (`৳530.50`) and checks out. The receipt shows `…-000001`. Staff sees the sale in history and the reduced stock (8 and 19), is redirected to Access denied on `/staff`, and signs out.
+4. HQ signs in and sees `৳530.50` for the outlet under _Today_, plus the top item, then signs out. Protected routes redirect to login again.
+
+```bash
+pnpm exec playwright install chromium            # once
+# create a local disposable database, migrate it, and seed an HQ admin:
+#   (in ../backend) DATABASE_URL=<local-db> pnpm db:migrate:deploy
+#   (in ../backend) DATABASE_URL=<local-db> ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm db:seed:admin
+E2E_DATABASE_URL=<local-db> E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… pnpm test:e2e
+```
+
+Result: **4/4 passed**. Running these tests found a real defect: the backend CORS policy allowed only `GET` and `POST`, so every cross-origin `PATCH`/`PUT` (stock adjustment, price, status, staff outlets) was blocked by the browser. The mocked unit tests could not catch this. It is fixed in the backend and covered by a regression test.
 
 ### Manual smoke test (against a running backend)
 
@@ -696,4 +728,4 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - There are no payments, discounts, taxes, refunds or offline POS (not in scope).
 - The outlet menu can't be sorted by effective price, because that needs a database-computed column to page correctly.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
-- There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.
+- The browser E2E suite is intentionally small (four tests on the core flows). It needs a local PostgreSQL and is not part of `pnpm test`.
