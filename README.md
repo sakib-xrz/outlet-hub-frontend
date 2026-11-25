@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client foundation for OutletHub, a multi-outlet POS management system. This package contains only the platform layer: authentication against the existing backend, routing, API and state infrastructure, the design system, the application shell and tooling. It has **no** POS business features (outlets, menus, inventory, sales, receipts, reporting).
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) and **Outlet Management** (phase 1). Staff, menu, inventory, sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -88,13 +88,15 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 
 `src/app/router.tsx` is the single route table, built with `createBrowserRouter`. `RouterProvider` comes from `react-router/dom`.
 
-| Path            | Guard                          | Notes                                                     |
-| --------------- | ------------------------------ | --------------------------------------------------------- |
-| `/`             | none                           | Sends you to `/dashboard` or `/login` based on auth state |
-| `/login`        | `PublicRoute`                  | Lazy auth layout and page                                 |
-| `/dashboard`    | `ProtectedRoute` → `RoleGuard` | Lazy app shell and page                                   |
-| `/unauthorized` | none                           | Lazy                                                      |
-| `*`             | none                           | Not-found page                                            |
+| Path                 | Guard                          | Notes                                                     |
+| -------------------- | ------------------------------ | --------------------------------------------------------- |
+| `/`                  | none                           | Sends you to `/dashboard` or `/login` based on auth state |
+| `/login`             | `PublicRoute`                  | Lazy auth layout and page                                 |
+| `/dashboard`         | `ProtectedRoute` → `RoleGuard` | Lazy app shell and page                                   |
+| `/outlets`           | `ProtectedRoute` → `RoleGuard` | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId` | `ProtectedRoute` → `RoleGuard` | Outlet details                                            |
+| `/unauthorized`      | none                           | Lazy                                                      |
+| `*`                  | none                           | Not-found page                                            |
 
 - **Code splitting:** pages and layouts load through the route `lazy` property. `HydrateFallback` covers the first lazy load, and the app shell shows a progress bar during navigation.
 - **No flash of protected content:** guards render a loader while auth status is `initializing`. Nothing protected appears until the session is restored or rejected.
@@ -105,6 +107,54 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 - **Guards are UX only.** The backend remains authoritative for authentication and authorization.
 
 To add a route, add it to `router.tsx` with `lazy`, under the right guard. Add a navigation entry, with its allowed roles, to `components/layout/navigation.ts` only once the page actually works.
+
+## Outlet management
+
+The code lives in `src/features/outlets/`, with pages in `src/pages/outlets/`. The sidebar shows **Outlets** to both roles.
+
+**List (`/outlets`):**
+
+- Search is debounced by 300 ms and matches code or name.
+- There is a status filter (all, active, inactive) and a sort option (newest, oldest, name, code, recently updated).
+- Pagination is server-side, 20 per page.
+- `search`, `status`, `sort` and `page` are kept in the URL, so refresh, sharing and back/forward work. Changing a filter resets to page 1, and default values are left out of the URL.
+- The list shows loading skeletons, an empty state that depends on the filters and role, an error state with retry, and a "past the last page" state.
+
+**Details (`/outlets/:outletId`):**
+
+- Shows code, name, address, status, created date and last-updated date.
+- 403 shows "No access to this outlet"; 404 or a malformed id shows "Outlet not found".
+
+**Management (HQ admins only):**
+
+- _Create outlet_ and _Edit_ open a dialog containing the shared `OutletForm`.
+  - The code is uppercased as you type, and is read-only when editing.
+  - The schemas mirror the backend's validation rules.
+  - Server field errors, including a duplicate code (409), appear on the matching field. Entered values are kept on failure, and the form resets when the dialog closes.
+- _Activate/Deactivate_ asks for confirmation first. The deactivation text explains that staff lose access, that future operations are blocked, and that records are preserved. There is no optimistic update: the UI changes only after the server confirms.
+- Staff see read-only views. The backend enforces the same rules.
+
+**Server state:**
+
+- Query keys:
+  - `outletKeys.all` = `['outlets']`
+  - `lists()` and `list(filters)`
+  - `details()` and `detail(id)`
+- Lists use `keepPreviousData`, so the table doesn't flash while paging.
+- After a successful create, edit or status change, the returned outlet is written to `detail(id)` and every list is invalidated.
+- Form mutations show errors inline (`suppressErrorToast`). Status-change errors use the global, de-duplicated toast.
+
+**Tests:** `tests/unit/outlets/` runs the real Axios client, interceptors, query client and router, with a mocked HTTP adapter. It covers:
+
+- listing, loading, empty and error states and retry;
+- debounced search with a page reset, and the status filter;
+- role-based actions;
+- create, plus list invalidation;
+- validation and duplicate-code errors;
+- edit, with a read-only code;
+- the status confirmation, including double-submit prevention;
+- 403 and 404 states;
+- service contract validation.
 
 ## Authentication
 
@@ -228,12 +278,12 @@ Run this only with approval; it writes refresh sessions to the shared database.
 
 ## Coolify deployment (static SPA)
 
-Create a separate Coolify application from the shared repository:
+Create a Coolify application from this repository. The backend is a separate repository and a separate Coolify application.
 
 | Setting           | Value                                                               |
 | ----------------- | ------------------------------------------------------------------- |
 | Build pack        | Nixpacks, with "Is it a static site?" enabled and the SPA option on |
-| Base directory    | `/frontend`                                                         |
+| Base directory    | `/` (this repository's root)                                        |
 | Install command   | `pnpm install --frozen-lockfile`                                    |
 | Build command     | `pnpm build`                                                        |
 | Publish directory | `dist`                                                              |
@@ -298,6 +348,7 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - If a tab closes after the backend rotated the cookie but before the browser stored the new one, the next refresh is treated as a replay. The backend has no grace window.
 - A logout made while offline clears only local state. The server session stays valid until it expires or is reused.
 - The backend uses one 401 code for all authentication failures, so the client tells them apart by endpoint context.
-- `RoleGuard` is wired to the dashboard, which allows both roles, because no role-restricted pages exist yet.
+- `RoleGuard` currently allows both roles on every page. Outlet management actions are hidden from staff in the UI, and the backend enforces the restriction.
+- Outlet dates are shown in the browser's local time zone.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

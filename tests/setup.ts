@@ -24,3 +24,10 @@ Object.defineProperty(window, 'matchMedia', {
 beforeEach(() => {
   localStorage.clear();
 });
+
+Object.assign(Element.prototype, {
+  hasPointerCapture: () => false,
+  setPointerCapture: () => undefined,
+  releasePointerCapture: () => undefined,
+  scrollIntoView: () => undefined,
+});
