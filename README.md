@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1) and **Staff & Outlet Membership Management** (phase 2). Menu, inventory, sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2) and **Master Menu Management** (phase 3). Outlet menu assignment, inventory, sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -88,17 +88,19 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 
 `src/app/router.tsx` is the single route table, built with `createBrowserRouter`. `RouterProvider` comes from `react-router/dom`.
 
-| Path                 | Guard                                    | Notes                                                     |
-| -------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `/`                  | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
-| `/login`             | `PublicRoute`                            | Lazy auth layout and page                                 |
-| `/dashboard`         | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
-| `/outlets`           | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
-| `/outlets/:outletId` | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
-| `/staff`             | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
-| `/staff/:staffId`    | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
-| `/unauthorized`      | none                                     | Lazy                                                      |
-| `*`                  | none                                     | Not-found page                                            |
+| Path                      | Guard                                    | Notes                                                     |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `/`                       | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
+| `/login`                  | `PublicRoute`                            | Lazy auth layout and page                                 |
+| `/dashboard`              | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
+| `/outlets`                | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId`      | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
+| `/staff`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
+| `/staff/:staffId`         | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
+| `/menu-items`             | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Master menu list; filters, sort and page live in the URL  |
+| `/menu-items/:menuItemId` | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Menu item details                                         |
+| `/unauthorized`           | none                                     | Lazy                                                      |
+| `*`                       | none                                     | Not-found page                                            |
 
 - **Code splitting:** pages and layouts load through the route `lazy` property. `HydrateFallback` covers the first lazy load, and the app shell shows a progress bar during navigation.
 - **No flash of protected content:** guards render a loader while auth status is `initializing`. Nothing protected appears until the session is restored or rejected.
@@ -209,6 +211,37 @@ The code lives in `src/features/staff/`, with pages in `src/pages/staff/`. The s
 - the status confirmation with double-submit prevention;
 - password reset validation, with no password left in the mutation cache;
 - the not-found state.
+
+## Master menu (HQ administrators only)
+
+The code lives in `src/features/menu-items/`, with pages in `src/pages/menu-items/`. The sidebar shows **Master Menu** only to `HQ_ADMIN`. Outlet staff who open the URL directly reach `/unauthorized`, and the backend returns 403.
+
+- **List:** debounced SKU/name search, status filter, sort (including by price), and server-side pagination, all kept in the URL. Changing a filter resets to page 1. Loading, empty, error-with-retry and past-the-last-page states.
+- **Create/edit dialog:** fields are SKU (uppercased as you type, read-only when editing), name, base price and description.
+  - The price input is `type="text"` with `inputMode="decimal"`. The value stays a string in form state, and `valueAsNumber` is never used.
+  - Validation matches the backend: up to 2 decimals, from 0 to 9,999,999,999.99, with no exponents or signs. On submit the price is padded to two decimals, so `12.5` is sent as `"12.50"`.
+  - A duplicate SKU (409) appears on the SKU field, and the entered values stay.
+  - Editing never sends `sku`.
+- **Details:** SKU, name, description, base price, master status, and created and updated dates, with Edit and Activate/Deactivate. 404 shows "Menu item not found"; 403 shows "Access denied".
+- **Deactivation confirmation:** explains that this is the **master** status, for all outlets at once. The item stops being sellable everywhere, while assignments, stock, overrides and past sales are kept. Activation explains that each outlet still needs its own active assignment.
+- **Money:**
+  - `src/lib/utils/money.ts` validates prices (`moneyInputSchema`) and formats them (`formatMoney`) using string operations only, with no `Number`.
+  - Responses are validated as `"<digits>.<2 digits>"` strings.
+  - The display currency is BDT (`৳`), a single-currency assumption because the schema has no currency column.
+- **Server state:** query keys are `menuItemKeys.all`, `lists()`, `list(filters)`, `details()` and `detail(id)`. Each mutation writes `detail(id)` and invalidates every list.
+- **Tests:** `tests/unit/menu-items/` and `tests/unit/lib/money.test.ts` cover:
+  - the list, empty, error and retry states;
+  - pagination, debounced search and sorting by price, stored in the URL;
+  - create validation, including bad decimal values;
+  - normalized string submission;
+  - duplicate SKUs;
+  - edit with a read-only SKU, keeping the price a string;
+  - details and not-found;
+  - the deactivation confirmation with double-submit prevention;
+  - HQ-only navigation and direct-URL blocking;
+  - exact formatting.
+
+**Phase 3 fix:** the staff password-reset success toast used to say the staff member was "signed out of all sessions". It now says refresh sessions were revoked and that access already granted may last up to 15 minutes, which matches the backend.
 
 ## Authentication
 
@@ -407,5 +440,6 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - The staff outlet filter offers the first 100 outlets by code. Assignment uses the fully paginated picker.
 - After a password reset, the staff member's existing access token works until it expires (up to 15 minutes). After reactivation, an unexpired token from before the deactivation works again. There is no access-token denylist.
 - Staff accounts have only an email. The schema has no name or phone fields.
+- Money is displayed in BDT (`৳`) as a fixed single-currency convention. There is no locale-specific currency formatting.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

@@ -1,4 +1,4 @@
-import { LayoutDashboard, type LucideIcon, Store, Users } from 'lucide-react';
+import { LayoutDashboard, type LucideIcon, Store, Users, UtensilsCrossed } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
 import { ROLES } from '@/features/auth/constants';
 import type { Role } from '@/features/auth/types/auth.types';
@@ -27,6 +27,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
     title: 'Staff',
     to: ROUTES.staff,
     icon: Users,
+    roles: [ROLES.HQ_ADMIN],
+  },
+  {
+    title: 'Master Menu',
+    to: ROUTES.menuItems,
+    icon: UtensilsCrossed,
     roles: [ROLES.HQ_ADMIN],
   },
 ];

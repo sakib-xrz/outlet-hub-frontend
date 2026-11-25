@@ -4,6 +4,7 @@ export const ROUTES = {
   dashboard: '/dashboard',
   outlets: '/outlets',
   staff: '/staff',
+  menuItems: '/menu-items',
   unauthorized: '/unauthorized',
 } as const;
 

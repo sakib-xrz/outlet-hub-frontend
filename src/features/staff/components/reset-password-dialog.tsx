@@ -34,7 +34,9 @@ function ResetPasswordForm({ staffId, onDone }: { staffId: string; onDone: () =>
     try {
       await reset.mutateAsync(newPassword);
       reset.reset();
-      toast.success('Password reset. The staff member has been signed out of all sessions.');
+      toast.success(
+        'Password reset. Their refresh sessions were revoked; access already granted may last up to 15 minutes.',
+      );
       onDone();
     } catch (error) {
       reset.reset();
