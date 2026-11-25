@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Boxes,
   FileQuestion,
   Pencil,
   Power,
@@ -108,6 +109,12 @@ export function OutletDetailsPage() {
             <Link to={`/outlets/${data.id}/menu`}>
               <UtensilsCrossed aria-hidden />
               {canManage ? 'Manage menu' : 'View menu'}
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to={`/outlets/${data.id}/inventory`}>
+              <Boxes aria-hidden />
+              {canManage ? 'Manage inventory' : 'View inventory'}
             </Link>
           </Button>
           {canManage && (

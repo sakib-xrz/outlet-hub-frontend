@@ -6,10 +6,21 @@ import { moneyInputSchema } from '@/lib/utils/money';
 
 export type Availability = { label: string; tone: 'ok' | 'warn' | 'off' };
 
+export type EnablementFlags = Pick<
+  OutletMenuItem,
+  'outletIsActive' | 'menuItemIsActive' | 'isActive'
+>;
+
+export function getDisabledReason(item: EnablementFlags): string | null {
+  if (!item.outletIsActive) return 'Outlet inactive';
+  if (!item.menuItemIsActive) return 'Master item inactive';
+  if (!item.isActive) return 'Assignment inactive';
+  return null;
+}
+
 export function getAvailability(item: OutletMenuItem): Availability {
-  if (!item.outletIsActive) return { label: 'Outlet inactive', tone: 'off' };
-  if (!item.menuItemIsActive) return { label: 'Master item inactive', tone: 'off' };
-  if (!item.isActive) return { label: 'Assignment inactive', tone: 'off' };
+  const disabled = getDisabledReason(item);
+  if (disabled) return { label: disabled, tone: 'off' };
   if (!item.isSellable) return { label: 'Out of stock', tone: 'warn' };
   return { label: 'Available', tone: 'ok' };
 }

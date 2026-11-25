@@ -1,4 +1,5 @@
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
+import { inventoryKeys } from '@/features/inventory/hooks/inventory-query-keys';
 import { outletMenuKeys } from '@/features/outlet-menu-items/hooks/outlet-menu-query-keys';
 import { outletKeys } from '@/features/outlets/hooks/outlet-query-keys';
 import { outletService } from '@/features/outlets/services/outlet.service';
@@ -39,6 +40,7 @@ export function useUpdateOutletStatus(outletId: string) {
       Promise.all([
         syncOutlet(queryClient, outlet),
         queryClient.invalidateQueries({ queryKey: outletMenuKeys.outlet(outlet.id) }),
+        queryClient.invalidateQueries({ queryKey: inventoryKeys.outlet(outlet.id) }),
       ]).then(() => undefined),
   });
 }

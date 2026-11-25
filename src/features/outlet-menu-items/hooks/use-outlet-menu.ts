@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { inventoryKeys } from '@/features/inventory/hooks/inventory-query-keys';
 import { outletMenuKeys } from '@/features/outlet-menu-items/hooks/outlet-menu-query-keys';
 import { outletMenuItemService } from '@/features/outlet-menu-items/services/outlet-menu-item.service';
 import type {
@@ -22,7 +23,10 @@ export function useOutletMenuQuery(outletId: string, filters: OutletMenuFilters)
 
 function syncAssignment(queryClient: QueryClient, item: OutletMenuItem): Promise<void> {
   queryClient.setQueryData(outletMenuKeys.detail(item.outletId, item.menuItemId), item);
-  return queryClient.invalidateQueries({ queryKey: outletMenuKeys.lists(item.outletId) });
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: outletMenuKeys.lists(item.outletId) }),
+    queryClient.invalidateQueries({ queryKey: inventoryKeys.outlet(item.outletId) }),
+  ]).then(() => undefined);
 }
 
 export function useAssignMenuItem(outletId: string) {

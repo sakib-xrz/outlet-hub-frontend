@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3) and **Outlet Menu Assignment & Price Overrides** (phase 4). Inventory, sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3), **Outlet Menu Assignment & Price Overrides** (phase 4) and **Inventory Management** (phase 5). sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -88,20 +88,21 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 
 `src/app/router.tsx` is the single route table, built with `createBrowserRouter`. `RouterProvider` comes from `react-router/dom`.
 
-| Path                      | Guard                                    | Notes                                                     |
-| ------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `/`                       | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
-| `/login`                  | `PublicRoute`                            | Lazy auth layout and page                                 |
-| `/dashboard`              | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
-| `/outlets`                | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
-| `/outlets/:outletId/menu` | `ProtectedRoute` → `RoleGuard`           | Outlet menu (HQ manages; staff view)                      |
-| `/outlets/:outletId`      | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
-| `/staff`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
-| `/staff/:staffId`         | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
-| `/menu-items`             | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Master menu list; filters, sort and page live in the URL  |
-| `/menu-items/:menuItemId` | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Menu item details                                         |
-| `/unauthorized`           | none                                     | Lazy                                                      |
-| `*`                       | none                                     | Not-found page                                            |
+| Path                           | Guard                                    | Notes                                                     |
+| ------------------------------ | ---------------------------------------- | --------------------------------------------------------- |
+| `/`                            | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
+| `/login`                       | `PublicRoute`                            | Lazy auth layout and page                                 |
+| `/dashboard`                   | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
+| `/outlets`                     | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId/inventory` | `ProtectedRoute` → `RoleGuard`           | Outlet inventory (HQ adjusts; staff view)                 |
+| `/outlets/:outletId/menu`      | `ProtectedRoute` → `RoleGuard`           | Outlet menu (HQ manages; staff view)                      |
+| `/outlets/:outletId`           | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
+| `/staff`                       | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
+| `/staff/:staffId`              | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
+| `/menu-items`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Master menu list; filters, sort and page live in the URL  |
+| `/menu-items/:menuItemId`      | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Menu item details                                         |
+| `/unauthorized`                | none                                     | Lazy                                                      |
+| `*`                            | none                                     | Not-found page                                            |
 
 - **Code splitting:** pages and layouts load through the route `lazy` property. `HydrateFallback` covers the first lazy load, and the app shell shows a progress bar during navigation.
 - **No flash of protected content:** guards render a loader while auth status is `initializing`. Nothing protected appears until the session is restored or rejected.
@@ -302,6 +303,62 @@ The route is `/outlets/:outletId/menu`. It is reached from the outlet details pa
 - route access;
 - master-menu and outlet-status cache invalidation.
 
+## Inventory
+
+The route is `/outlets/:outletId/inventory`. It is reached from outlet details (**Manage inventory** for HQ, **View inventory** for staff) and from the outlet menu page. The code lives in `src/features/inventory/` and `src/pages/outlets/outlet-inventory-page.tsx`.
+
+**List:**
+
+- Columns: SKU, item, stock, stock level, sales availability, last updated, and _Adjust_ (HQ only).
+- **Stock level** is _In stock_ (more than 10), _Low stock_ (1–10) or _Out of stock_ (0).
+- **Sales availability** is shown separately: _Enabled_, or the reason the item isn't (outlet, master item or assignment inactive). It uses the same `getDisabledReason` helper as the outlet menu. An inactive item with 100 units reads _In stock_ · _Master item inactive_.
+- Filters: stock level, assignment status (HQ only), search and sort, plus pagination. All are kept in the URL, and changing a filter resets to page 1.
+- No totals are shown, because figures computed from one page would be misleading.
+- Staff get a read-only list of enabled items.
+- _Adjust_ is disabled, with a note, while the outlet is inactive.
+
+**Adjust stock dialog:**
+
+- Shows the item, its current stock, and three operations: _Add stock_, _Reduce stock_ and _Set stock quantity_.
+- The quantity is a text field with `inputMode="numeric"`, validated as a whole number.
+- Validation and preview:
+  - It blocks known insufficient reductions ("Only 5 in stock") and results above 2147483647.
+  - The **resulting stock** preview is advisory; the server re-checks.
+- **`SET` and stale stock:**
+  - `SET` sends `expectedStockQuantity` equal to the balance **captured when the dialog opened**. Background refetches don't change it.
+  - On 409 `STOCK_CHANGED` (or `INSUFFICIENT_STOCK` / `STOCK_LIMIT_EXCEEDED`), the dialog fetches the latest balance, shows "The current stock is now N", keeps the entered values, and waits for the admin to confirm again with the new baseline.
+- **Other conflicts** (`OUTLET_INACTIVE`, `CONCURRENT_UPDATE`) show a specific message.
+- **Ambiguous failures** (network, timeout, 5xx):
+  - Nothing is resubmitted.
+  - Inventory and the outlet menu are refreshed, and the latest balance is shown with a request to verify it before trying again. This matters because `INCREASE`/`DECREASE` are not idempotent.
+- Submit is disabled while pending. Success shows "SKU: stock 50 → 70".
+- The dialog states that adjustments aren't kept as a history.
+
+**Cache:**
+
+- Query keys: `inventoryKeys.all` (`['inventory']`), `outlet(id)`, `lists(id)`, `list(id, filters)`, `details(id)` and `detail(id, menuItemId)`.
+- A successful adjustment writes `detail`, and invalidates that outlet's inventory **and** outlet-menu queries, so stock and sellability stay in sync.
+- These also invalidate the affected inventory:
+  - outlet-menu assign and status changes (that outlet);
+  - master-menu changes (all inventory);
+  - outlet status changes (that outlet).
+
+**Tests:** `tests/unit/inventory/` covers:
+
+- stock-level and availability labels, including inactive with stock;
+- inactive-outlet blocking;
+- the staff read-only view;
+- loading, empty, error and retry states;
+- stock-level and search filters, and pagination;
+- the details links;
+- increase with preview and cache invalidation;
+- whole-number, insufficient-stock and overflow validation;
+- reduce-to-zero;
+- the SET baseline surviving a refetch, then stale-conflict recovery;
+- an ambiguous network failure sending exactly one request;
+- duplicate-submit prevention;
+- conflict messages.
+
 ## Authentication
 
 ### Backend contract (verified against `backend/src`)
@@ -500,7 +557,9 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - After a password reset, the staff member's existing access token works until it expires (up to 15 minutes). After reactivation, an unexpired token from before the deactivation works again. There is no access-token denylist.
 - Staff accounts have only an email. The schema has no name or phone fields.
 - Money is displayed in BDT (`৳`) as a fixed single-currency convention. There is no locale-specific currency formatting.
-- Stock is shown read-only. Inventory adjustment arrives in a later phase.
+- Inventory keeps only the current balance. There is no movement history, supplier or transfer tracking.
+- `INCREASE`/`DECREASE` are not idempotent. After an ambiguous failure the UI refreshes and asks the admin to verify; it never replays.
+- The low-stock threshold is a fixed 10 units for every item.
 - The outlet menu can't be sorted by effective price, because that needs a database-computed column to page correctly.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

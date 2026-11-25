@@ -1,5 +1,6 @@
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
 import { menuItemKeys } from '@/features/menu-items/hooks/menu-item-query-keys';
+import { inventoryKeys } from '@/features/inventory/hooks/inventory-query-keys';
 import { outletMenuKeys } from '@/features/outlet-menu-items/hooks/outlet-menu-query-keys';
 import { menuItemService } from '@/features/menu-items/services/menu-item.service';
 import type {
@@ -13,6 +14,7 @@ function syncMenuItem(queryClient: QueryClient, item: MenuItem): Promise<void> {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: menuItemKeys.lists() }),
     queryClient.invalidateQueries({ queryKey: outletMenuKeys.all }),
+    queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
   ]).then(() => undefined);
 }
 

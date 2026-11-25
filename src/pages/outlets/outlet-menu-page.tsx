@@ -1,4 +1,4 @@
-import { ArrowLeft, FileQuestion, Plus, ShieldAlert, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Boxes, FileQuestion, Plus, ShieldAlert, UtensilsCrossed } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { PageContainer } from '@/components/layout/page-container';
@@ -83,12 +83,20 @@ export function OutletMenuPage() {
           : 'Items available in this outlet, with current prices and stock.'
       }
       actions={
-        canManage && (
-          <Button onClick={() => setAssigning(true)} disabled={outletData?.isActive === false}>
-            <Plus aria-hidden />
-            Assign menu item
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to={`/outlets/${outletId}/inventory`}>
+              <Boxes aria-hidden />
+              Inventory
+            </Link>
           </Button>
-        )
+          {canManage && (
+            <Button onClick={() => setAssigning(true)} disabled={outletData?.isActive === false}>
+              <Plus aria-hidden />
+              Assign menu item
+            </Button>
+          )}
+        </div>
       }
     >
       <BackLink outletId={outletId} />
