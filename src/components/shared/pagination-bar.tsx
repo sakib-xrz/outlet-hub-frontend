@@ -1,21 +1,23 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { OutletPage } from '@/features/outlets/types/outlet.types';
 
-type OutletPaginationProps = {
-  pagination: OutletPage['pagination'];
+export type Pagination = { page: number; limit: number; total: number; totalPages: number };
+
+type PaginationBarProps = {
+  label: string;
+  pagination: Pagination;
   itemCount: number;
   onPageChange: (page: number) => void;
 };
 
-export function OutletPagination({ pagination, itemCount, onPageChange }: OutletPaginationProps) {
+export function PaginationBar({ label, pagination, itemCount, onPageChange }: PaginationBarProps) {
   const { page, limit, total, totalPages } = pagination;
   const first = total === 0 ? 0 : (page - 1) * limit + 1;
   const last = (page - 1) * limit + itemCount;
 
   return (
     <nav
-      aria-label="Outlet pages"
+      aria-label={label}
       className="flex flex-col items-center justify-between gap-2 sm:flex-row"
     >
       <p className="text-sm text-muted-foreground" aria-live="polite">

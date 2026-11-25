@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { OutletActions } from '@/features/outlets/components/outlet-actions';
-import { OutletStatusBadge } from '@/features/outlets/components/outlet-status-badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import type { Outlet } from '@/features/outlets/types/outlet.types';
 import { formatDate } from '@/lib/utils/format';
 
@@ -53,7 +53,7 @@ export function OutletTable({ outlets, canManage }: { outlets: Outlet[]; canMana
                 {outlet.address ?? '—'}
               </TableCell>
               <TableCell>
-                <OutletStatusBadge isActive={outlet.isActive} />
+                <StatusBadge isActive={outlet.isActive} />
               </TableCell>
               <TableCell className="hidden text-muted-foreground md:table-cell">
                 {formatDate(outlet.createdAt)}

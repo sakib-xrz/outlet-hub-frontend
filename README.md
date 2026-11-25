@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) and **Outlet Management** (phase 1). Staff, menu, inventory, sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1) and **Staff & Outlet Membership Management** (phase 2). Menu, inventory, sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -88,15 +88,17 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 
 `src/app/router.tsx` is the single route table, built with `createBrowserRouter`. `RouterProvider` comes from `react-router/dom`.
 
-| Path                 | Guard                          | Notes                                                     |
-| -------------------- | ------------------------------ | --------------------------------------------------------- |
-| `/`                  | none                           | Sends you to `/dashboard` or `/login` based on auth state |
-| `/login`             | `PublicRoute`                  | Lazy auth layout and page                                 |
-| `/dashboard`         | `ProtectedRoute` → `RoleGuard` | Lazy app shell and page                                   |
-| `/outlets`           | `ProtectedRoute` → `RoleGuard` | Outlet list; filters, sort and page live in the URL       |
-| `/outlets/:outletId` | `ProtectedRoute` → `RoleGuard` | Outlet details                                            |
-| `/unauthorized`      | none                           | Lazy                                                      |
-| `*`                  | none                           | Not-found page                                            |
+| Path                 | Guard                                    | Notes                                                     |
+| -------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `/`                  | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
+| `/login`             | `PublicRoute`                            | Lazy auth layout and page                                 |
+| `/dashboard`         | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
+| `/outlets`           | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId` | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
+| `/staff`             | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
+| `/staff/:staffId`    | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
+| `/unauthorized`      | none                                     | Lazy                                                      |
+| `*`                  | none                                     | Not-found page                                            |
 
 - **Code splitting:** pages and layouts load through the route `lazy` property. `HydrateFallback` covers the first lazy load, and the app shell shows a progress bar during navigation.
 - **No flash of protected content:** guards render a loader while auth status is `initializing`. Nothing protected appears until the session is restored or rejected.
@@ -155,6 +157,58 @@ The code lives in `src/features/outlets/`, with pages in `src/pages/outlets/`. T
 - the status confirmation, including double-submit prevention;
 - 403 and 404 states;
 - service contract validation.
+
+## Staff management (HQ administrators only)
+
+The code lives in `src/features/staff/`, with pages in `src/pages/staff/`. The sidebar shows **Staff** only to `HQ_ADMIN`. Outlet staff who open `/staff` directly are sent to `/unauthorized` by `RoleGuard`, and the backend also rejects them.
+
+**List (`/staff`):**
+
+- Debounced email search, status filter, outlet filter, sort, and server-side pagination. All of it is kept in the URL.
+- Loading, empty, error-with-retry and past-the-last-page states.
+- The outlet filter lists the first 100 outlets by code. An outlet selected through the URL but beyond those still filters correctly.
+
+**Create:**
+
+- Fields: email, password, confirm password, and outlets (optional).
+- The confirmation is checked on the client and never sent.
+- The password rules match the backend: 12–128 characters, not just spaces, not the email.
+- A duplicate email (409) appears on the email field. The entered values stay, and the passwords are cleared when the dialog closes.
+
+**Details (`/staff/:staffId`):**
+
+- Shows email, role, status, created and updated dates, and the assigned outlets (with status) linking to their outlet pages.
+- Actions: edit email, manage outlets, reset password, and activate/deactivate.
+
+**Outlet picker** (`features/outlets/components/outlet-picker.tsx`):
+
+- A searchable, server-paged checkbox list (`useInfiniteQuery`, 50 per page, _Load more_).
+- Selections are stored separately from search results, so searching or paging never drops a selection.
+- Inactive outlets are marked and disabled for new assignment. Existing inactive assignments stay checked and can be kept or removed.
+- _Remove all_ sends `[]`.
+- The dialog submits the complete intended set and shows how many outlets will be added and removed.
+- The form initializes once per opening, so a background refetch doesn't overwrite an in-progress selection. The last save wins.
+
+**Status and password:**
+
+- The deactivate confirmation explains that sessions are revoked and records are preserved.
+- The reset-password dialog has new and confirm fields with a visibility toggle. It explains that sessions are revoked and that access already granted can last up to 15 minutes.
+- Password mutations use `gcTime: 0` and are reset right after they settle, so no password stays in the TanStack mutation cache or devtools. Form state goes away when the dialog closes.
+
+**Server state:** query keys are `staffKeys.all`, `lists()`, `list(filters)`, `details()` and `detail(id)`. After each mutation, the returned staff record is written to `detail(id)` and every list is invalidated.
+
+**Tests:** `tests/unit/staff/` covers:
+
+- the list, empty, error and retry states;
+- pagination, debounced search and the outlet filter, stored in the URL;
+- HQ-only navigation and direct-URL blocking;
+- create validation, a password mismatch, outlet selection, and that the confirmation is never sent;
+- duplicate emails;
+- email edits with a conflict;
+- assignment rules (inactive outlets kept or blocked, the selection surviving search and background refetch, remove all, load more);
+- the status confirmation with double-submit prevention;
+- password reset validation, with no password left in the mutation cache;
+- the not-found state.
 
 ## Authentication
 
@@ -350,5 +404,8 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - The backend uses one 401 code for all authentication failures, so the client tells them apart by endpoint context.
 - `RoleGuard` currently allows both roles on every page. Outlet management actions are hidden from staff in the UI, and the backend enforces the restriction.
 - Outlet dates are shown in the browser's local time zone.
+- The staff outlet filter offers the first 100 outlets by code. Assignment uses the fully paginated picker.
+- After a password reset, the staff member's existing access token works until it expires (up to 15 minutes). After reactivation, an unexpired token from before the deactivation works again. There is no access-token denylist.
+- Staff accounts have only an email. The schema has no name or phone fields.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

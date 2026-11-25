@@ -3,6 +3,7 @@ export const ROUTES = {
   login: '/login',
   dashboard: '/dashboard',
   outlets: '/outlets',
+  staff: '/staff',
   unauthorized: '/unauthorized',
 } as const;
 

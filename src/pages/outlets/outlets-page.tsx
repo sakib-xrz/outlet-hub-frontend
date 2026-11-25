@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useIsHqAdmin } from '@/features/auth/hooks/use-session';
 import { OutletFilters } from '@/features/outlets/components/outlet-filters';
 import { OutletFormDialog } from '@/features/outlets/components/outlet-form-dialog';
-import { OutletPagination } from '@/features/outlets/components/outlet-pagination';
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import { OutletTable, OutletTableSkeleton } from '@/features/outlets/components/outlet-table';
 import { useOutletFilters } from '@/features/outlets/hooks/use-outlet-filters';
 import { useOutletsQuery } from '@/features/outlets/hooks/use-outlets-query';
@@ -81,7 +81,8 @@ export function OutletsPage() {
       ) : (
         <div className="flex flex-col gap-4" aria-busy={outlets.isFetching}>
           <OutletTable outlets={outlets.data.items} canManage={canManage} />
-          <OutletPagination
+          <PaginationBar
+            label="Outlet pages"
             pagination={outlets.data.pagination}
             itemCount={outlets.data.items.length}
             onPageChange={(page) => setFilters({ page })}

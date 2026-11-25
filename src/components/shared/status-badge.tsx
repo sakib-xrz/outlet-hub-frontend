@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { Badge } from '@/components/ui/badge';
 
-export function OutletStatusBadge({ isActive }: { isActive: boolean }) {
+export function StatusBadge({ isActive }: { isActive: boolean }) {
   return (
     <Badge variant={isActive ? 'secondary' : 'outline'} className="gap-1.5">
       <span

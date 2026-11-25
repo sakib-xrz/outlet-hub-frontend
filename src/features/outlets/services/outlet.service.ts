@@ -17,11 +17,11 @@ import type {
 const pageResponse = successResponseSchema(outletPageSchema);
 const outletResponse = successResponseSchema(outletPayloadSchema);
 
-function toQueryParams(filters: OutletFilters): Record<string, string | number> {
+function toQueryParams(filters: OutletFilters, limit: number): Record<string, string | number> {
   const { sortBy, sortOrder } = OUTLET_SORT_OPTIONS[filters.sort];
   return {
     page: filters.page,
-    limit: OUTLET_PAGE_SIZE,
+    limit,
     status: filters.status,
     sortBy,
     sortOrder,
@@ -30,9 +30,13 @@ function toQueryParams(filters: OutletFilters): Record<string, string | number> 
 }
 
 export const outletService = {
-  async list(filters: OutletFilters, signal?: AbortSignal): Promise<OutletPage> {
+  async list(
+    filters: OutletFilters,
+    signal?: AbortSignal,
+    limit: number = OUTLET_PAGE_SIZE,
+  ): Promise<OutletPage> {
     const response = await apiClient.get('/outlets', {
-      params: toQueryParams(filters),
+      params: toQueryParams(filters, limit),
       ...(signal && { signal }),
     });
     return parseResponse(pageResponse, response.data).data;

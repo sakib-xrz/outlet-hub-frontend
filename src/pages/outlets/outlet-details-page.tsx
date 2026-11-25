@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsHqAdmin } from '@/features/auth/hooks/use-session';
 import { OutletFormDialog } from '@/features/outlets/components/outlet-form-dialog';
-import { OutletStatusBadge } from '@/features/outlets/components/outlet-status-badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { OutletStatusDialog } from '@/features/outlets/components/outlet-status-dialog';
 import { useOutletQuery } from '@/features/outlets/hooks/use-outlet-query';
 import { normalizeApiError } from '@/lib/api/errors';
@@ -124,7 +124,7 @@ export function OutletDetailsPage() {
               {data.address ?? <span className="text-muted-foreground">Not provided</span>}
             </Detail>
             <Detail label="Status">
-              <OutletStatusBadge isActive={data.isActive} />
+              <StatusBadge isActive={data.isActive} />
             </Detail>
             <Detail label="Created">{formatDateTime(data.createdAt)}</Detail>
             <Detail label="Last updated">{formatDateTime(data.updatedAt)}</Detail>

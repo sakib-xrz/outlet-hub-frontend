@@ -65,6 +65,24 @@ export const routes: RouteObject[] = [
                   },
                 ],
               },
+              {
+                element: <RoleGuard allow={[ROLES.HQ_ADMIN]} />,
+                children: [
+                  {
+                    path: 'staff',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/staff/staff-page')).StaffPage,
+                    }),
+                  },
+                  {
+                    path: 'staff/:staffId',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/staff/staff-details-page'))
+                        .StaffDetailsPage,
+                    }),
+                  },
+                ],
+              },
             ],
           },
         ],

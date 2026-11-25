@@ -31,3 +31,18 @@ Object.assign(Element.prototype, {
   releasePointerCapture: () => undefined,
   scrollIntoView: () => undefined,
 });
+
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  writable: true,
+  value: class ResizeObserver {
+    observe(): undefined {
+      return undefined;
+    }
+    unobserve(): undefined {
+      return undefined;
+    }
+    disconnect(): undefined {
+      return undefined;
+    }
+  },
+});

@@ -1,7 +1,7 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderResult } from '@testing-library/react';
 import type { InternalAxiosRequestConfig } from 'axios';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter, type RouteObject, RouterProvider } from 'react-router';
 import { Toaster } from 'sonner';
 import { useAuthStore } from '@/features/auth/stores/auth.store';
 import type { Role } from '@/features/auth/types/auth.types';
@@ -77,23 +77,29 @@ export function outletBody(value: Outlet) {
 
 export const ok = (config: InternalAxiosRequestConfig, body: unknown) => respond(config, 200, body);
 
-export function renderOutlets(
+export function renderRoutes(
+  routes: RouteObject[],
   path: string,
-): RenderResult & { router: ReturnType<typeof createMemoryRouter> } {
+): RenderResult & { router: ReturnType<typeof createMemoryRouter>; queryClient: QueryClient } {
   const queryClient = createQueryClient();
-  queryClient.setDefaultOptions({ queries: { retry: false } });
-  const router = createMemoryRouter(
-    [
-      { path: '/outlets', Component: OutletsPage },
-      { path: '/outlets/:outletId', Component: OutletDetailsPage },
-    ],
-    { initialEntries: [path] },
-  );
+  const defaults = queryClient.getDefaultOptions();
+  queryClient.setDefaultOptions({ ...defaults, queries: { ...defaults.queries, retry: false } });
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
   const result = render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster />
     </QueryClientProvider>,
   );
-  return { ...result, router };
+  return { ...result, router, queryClient };
+}
+
+export function renderOutlets(path: string): ReturnType<typeof renderRoutes> {
+  return renderRoutes(
+    [
+      { path: '/outlets', Component: OutletsPage },
+      { path: '/outlets/:outletId', Component: OutletDetailsPage },
+    ],
+    path,
+  );
 }

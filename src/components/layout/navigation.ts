@@ -1,4 +1,4 @@
-import { LayoutDashboard, type LucideIcon, Store } from 'lucide-react';
+import { LayoutDashboard, type LucideIcon, Store, Users } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
 import { ROLES } from '@/features/auth/constants';
 import type { Role } from '@/features/auth/types/auth.types';
@@ -22,5 +22,11 @@ export const NAVIGATION: readonly NavigationItem[] = [
     to: ROUTES.outlets,
     icon: Store,
     roles: [ROLES.HQ_ADMIN, ROLES.OUTLET_STAFF],
+  },
+  {
+    title: 'Staff',
+    to: ROUTES.staff,
+    icon: Users,
+    roles: [ROLES.HQ_ADMIN],
   },
 ];
