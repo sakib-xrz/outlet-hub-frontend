@@ -5,7 +5,9 @@ import {
   Pencil,
   Power,
   PowerOff,
+  ReceiptText,
   ShieldAlert,
+  ShoppingCart,
   UtensilsCrossed,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -105,6 +107,20 @@ export function OutletDetailsPage() {
       description={`Outlet ${data.code}`}
       actions={
         <div className="flex flex-wrap gap-2">
+          {!canManage && data.isActive && (
+            <Button asChild>
+              <Link to={`/outlets/${data.id}/pos`}>
+                <ShoppingCart aria-hidden />
+                Open POS
+              </Link>
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link to={`/outlets/${data.id}/sales`}>
+              <ReceiptText aria-hidden />
+              Sales history
+            </Link>
+          </Button>
           <Button asChild variant="outline">
             <Link to={`/outlets/${data.id}/menu`}>
               <UtensilsCrossed aria-hidden />

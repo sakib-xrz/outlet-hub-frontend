@@ -1,6 +1,6 @@
 # OutletHub Frontend
 
-Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3), **Outlet Menu Assignment & Price Overrides** (phase 4) and **Inventory Management** (phase 5). sales, receipt and reporting features are not implemented yet.
+Web client for OutletHub, a multi-outlet POS management system. It contains the platform layer (authentication, routing, API and state infrastructure, design system, application shell, tooling) **Outlet Management** (phase 1), **Staff & Outlet Membership Management** (phase 2), **Master Menu Management** (phase 3), **Outlet Menu Assignment & Price Overrides** (phase 4), **Inventory Management** (phase 5) and **POS Sales & Receipts** (phase 6). Reporting is not implemented yet. sales, receipt and reporting features are not implemented yet.
 
 ## Stack
 
@@ -88,21 +88,24 @@ Every `VITE_*` value is embedded in the public JavaScript bundle. Never put secr
 
 `src/app/router.tsx` is the single route table, built with `createBrowserRouter`. `RouterProvider` comes from `react-router/dom`.
 
-| Path                           | Guard                                    | Notes                                                     |
-| ------------------------------ | ---------------------------------------- | --------------------------------------------------------- |
-| `/`                            | none                                     | Sends you to `/dashboard` or `/login` based on auth state |
-| `/login`                       | `PublicRoute`                            | Lazy auth layout and page                                 |
-| `/dashboard`                   | `ProtectedRoute` → `RoleGuard`           | Lazy app shell and page                                   |
-| `/outlets`                     | `ProtectedRoute` → `RoleGuard`           | Outlet list; filters, sort and page live in the URL       |
-| `/outlets/:outletId/inventory` | `ProtectedRoute` → `RoleGuard`           | Outlet inventory (HQ adjusts; staff view)                 |
-| `/outlets/:outletId/menu`      | `ProtectedRoute` → `RoleGuard`           | Outlet menu (HQ manages; staff view)                      |
-| `/outlets/:outletId`           | `ProtectedRoute` → `RoleGuard`           | Outlet details                                            |
-| `/staff`                       | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff list; filters, sort and page live in the URL        |
-| `/staff/:staffId`              | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Staff details and management actions                      |
-| `/menu-items`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Master menu list; filters, sort and page live in the URL  |
-| `/menu-items/:menuItemId`      | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)` | Menu item details                                         |
-| `/unauthorized`                | none                                     | Lazy                                                      |
-| `*`                            | none                                     | Not-found page                                            |
+| Path                               | Guard                                        | Notes                                                     |
+| ---------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
+| `/`                                | none                                         | Sends you to `/dashboard` or `/login` based on auth state |
+| `/login`                           | `PublicRoute`                                | Lazy auth layout and page                                 |
+| `/dashboard`                       | `ProtectedRoute` → `RoleGuard`               | Lazy app shell and page                                   |
+| `/outlets`                         | `ProtectedRoute` → `RoleGuard`               | Outlet list; filters, sort and page live in the URL       |
+| `/outlets/:outletId/pos`           | `ProtectedRoute` → `RoleGuard(OUTLET_STAFF)` | Point of sale                                             |
+| `/outlets/:outletId/sales`         | `ProtectedRoute` → `RoleGuard`               | Sales history                                             |
+| `/outlets/:outletId/sales/:saleId` | `ProtectedRoute` → `RoleGuard`               | Receipt / sale details                                    |
+| `/outlets/:outletId/inventory`     | `ProtectedRoute` → `RoleGuard`               | Outlet inventory (HQ adjusts; staff view)                 |
+| `/outlets/:outletId/menu`          | `ProtectedRoute` → `RoleGuard`               | Outlet menu (HQ manages; staff view)                      |
+| `/outlets/:outletId`               | `ProtectedRoute` → `RoleGuard`               | Outlet details                                            |
+| `/staff`                           | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)`     | Staff list; filters, sort and page live in the URL        |
+| `/staff/:staffId`                  | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)`     | Staff details and management actions                      |
+| `/menu-items`                      | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)`     | Master menu list; filters, sort and page live in the URL  |
+| `/menu-items/:menuItemId`          | `ProtectedRoute` → `RoleGuard(HQ_ADMIN)`     | Menu item details                                         |
+| `/unauthorized`                    | none                                         | Lazy                                                      |
+| `*`                                | none                                         | Not-found page                                            |
 
 - **Code splitting:** pages and layouts load through the route `lazy` property. `HydrateFallback` covers the first lazy load, and the app shell shows a progress bar during navigation.
 - **No flash of protected content:** guards render a loader while auth status is `initializing`. Nothing protected appears until the session is restored or rejected.
@@ -359,6 +362,74 @@ The route is `/outlets/:outletId/inventory`. It is reached from outlet details (
 - duplicate-submit prevention;
 - conflict messages.
 
+## POS, checkout and receipts
+
+The code lives in `src/features/sales/`, with pages `outlet-pos-page.tsx`, `outlet-sales-page.tsx` and `sale-details-page.tsx`.
+
+**Navigation:**
+
+- Outlet details shows **Open POS** to staff of an active outlet, and **Sales history** to both roles.
+- The POS route is `OUTLET_STAFF` only. HQ admins reaching it get _Access denied_, and the backend also refuses.
+
+**Catalog:**
+
+- Reads the outlet-menu API for the current outlet (`status=active`; the backend returns only enabled items to staff), never the master menu.
+- Search plus _Load more_ paging.
+- Cards show name, SKU, effective price and stock. Zero-stock items are disabled, and _Add_ stops at the displayed stock.
+- Stock is labelled as provisional: the server re-checks it at checkout.
+- The query key includes the outlet id, so results from another outlet can't appear.
+
+**Cart:**
+
+- A small Zustand store keyed by `userId:outletId`, wiped whenever the auth session changes. Carts never cross users or outlets, and only one line exists per item.
+- Quantities can be changed with the stepper or by typing, and are limited to the displayed stock.
+- Remove and clear (clear asks for confirmation).
+- Amounts use **BigInt minor units** (`multiplyMoney`, `sumMoney` in `lib/utils/money.ts`), never floats. The total is provisional; the server is authoritative.
+- The price in a cart line is the price seen when the item was added. A later catalog change never silently alters what is submitted.
+
+**Checkout and idempotency** (`hooks/use-checkout.ts`):
+
+1. _Checkout_ opens a confirmation showing the total.
+2. On confirm, a `crypto.randomUUID()` request id is generated. The frozen payload (lines with their expected prices) is saved to `sessionStorage` under `outlethub:pending-sale:<userId>:<outletId>` before the single `POST`. Only ids, names, quantities and prices are stored, never tokens.
+3. Double submission is prevented by a busy state, disabled buttons and an in-flight guard. Checkout mutations are never retried automatically.
+4. **Success** (201 new or 200 replay): the pending request is cleared, the cart emptied and the receipt shown. The sale detail is cached, and that outlet's menu, inventory and sales queries are invalidated.
+5. **Uncertain outcome** (network, timeout, 5xx, rate limit or `CONCURRENT_UPDATE`):
+   - The cart and the frozen request stay locked; they can't be edited into a different payload under the same id.
+   - The recovery panel explains the sale may already be recorded. It offers **Check sale status** (`GET …/by-request/:requestId`), **Retry same sale** (the same id and payload) and **Discard** (with a warning).
+   - A 404 from check-status says "not found yet" and suggests retrying the same sale.
+6. **Page reload:** a stored pending request opens straight into the recovery panel. It is **never** resubmitted automatically.
+7. **Definitive rejections:**
+   - **`PRICE_CHANGED`, `INSUFFICIENT_STOCK` or `ITEM_UNAVAILABLE`:** the pending request is cleared and the cart kept. Each affected line is marked ("Price changed ৳250.00 → ৳260.00", with an _Accept new price_ button; "Only 1 available"; "No longer available"), and the catalog is refreshed. Checkout stays disabled until every flag is resolved. The next confirmation uses a **new** request id.
+   - **Other rejections** (`IDEMPOTENCY_CONFLICT`, `OUTLET_INACTIVE`, limits, 403) clear the pending request and show a message.
+
+**Receipt:**
+
+- Shows outlet name and code, receipt code, date and time, cashier (your email, or a staff id prefix), lines with quantity, unit price and line total, and the total in BDT. Every value comes from the stored sale snapshot.
+- The completed-sale view offers **Print receipt**, **View sale details** and **Start new sale**.
+- Printing uses `window.print()`. A print stylesheet in `globals.css` hides the sidebar, header and every `[data-print-hide]` control. There is no PDF or printer integration.
+
+**Sales history:**
+
+- Receipt-number search, sort, pagination, and loading, empty, error and past-the-last-page states.
+- Columns: receipt, date, items/units, total, and _View_.
+- No revenue totals are shown, because figures from one page would be misleading.
+
+**Tests:** `tests/unit/sales/` covers:
+
+- exact cart money and the BigInt maximum;
+- cart limits, plus isolation by user, outlet and session;
+- the outlet-scoped catalog, search and the out-of-stock state;
+- cart editing totals;
+- multi-item checkout with a single POST and cache invalidation;
+- the same request id and payload across an uncertain failure and manual retry;
+- reload recovery with no automatic POST, plus check-status (404, then found);
+- a price change requiring acceptance and a new request id;
+- insufficient-stock correction;
+- the idempotency conflict;
+- POS role restriction and the details actions;
+- receipt snapshot rendering and printing;
+- history listing, search, pagination and states.
+
 ## Authentication
 
 ### Backend contract (verified against `backend/src`)
@@ -560,6 +631,9 @@ Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install
 - Inventory keeps only the current balance. There is no movement history, supplier or transfer tracking.
 - `INCREASE`/`DECREASE` are not idempotent. After an ambiguous failure the UI refreshes and asks the admin to verify; it never replays.
 - The low-stock threshold is a fixed 10 units for every item.
+- Receipts show the outlet's _current_ name, because the schema doesn't snapshot it. Codes, item names and prices are snapshotted.
+- The pending checkout lives in `sessionStorage`, so it doesn't survive closing the tab. It is still safe: a lost tab never resubmits, and the sale (if it committed) is in the history.
+- There are no payments, discounts, taxes, refunds or offline POS (not in scope).
 - The outlet menu can't be sorted by effective price, because that needs a database-computed column to page correctly.
 - `pnpm audit` reports one moderate advisory (minimatch) through the dev-only `shadcn` CLI. It is not in the production bundle; `security:audit --prod` is clean.
 - There are no browser E2E tests, by design. The production build was smoke-tested over HTTP only.

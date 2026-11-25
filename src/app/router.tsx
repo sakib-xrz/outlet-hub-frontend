@@ -57,6 +57,20 @@ export const routes: RouteObject[] = [
                     }),
                   },
                   {
+                    path: 'outlets/:outletId/sales',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/outlets/outlet-sales-page'))
+                        .OutletSalesPage,
+                    }),
+                  },
+                  {
+                    path: 'outlets/:outletId/sales/:saleId',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/outlets/sale-details-page'))
+                        .SaleDetailsPage,
+                    }),
+                  },
+                  {
                     path: 'outlets/:outletId/inventory',
                     lazy: async () => ({
                       Component: (await import('@/pages/outlets/outlet-inventory-page'))
@@ -74,6 +88,17 @@ export const routes: RouteObject[] = [
                     lazy: async () => ({
                       Component: (await import('@/pages/outlets/outlet-details-page'))
                         .OutletDetailsPage,
+                    }),
+                  },
+                ],
+              },
+              {
+                element: <RoleGuard allow={[ROLES.OUTLET_STAFF]} />,
+                children: [
+                  {
+                    path: 'outlets/:outletId/pos',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/outlets/outlet-pos-page')).OutletPosPage,
                     }),
                   },
                 ],

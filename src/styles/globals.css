@@ -132,3 +132,21 @@
     scroll-behavior: auto !important;
   }
 }
+
+@media print {
+  [data-slot='sidebar'],
+  [data-slot='sidebar-gap'],
+  [data-slot='sidebar-inset'] > header,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  [data-slot='sidebar-inset'] {
+    margin: 0 !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+}

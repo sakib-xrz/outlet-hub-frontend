@@ -16,7 +16,11 @@ export type ApiErrorKind =
   | 'server'
   | 'unknown';
 
-export type FieldError = { field: string; message: string };
+export type FieldError = {
+  field: string;
+  message: string;
+  meta?: Record<string, string | number>;
+};
 
 const DEFAULT_MESSAGES: Record<ApiErrorKind, string> = {
   network: 'Unable to reach the server. Check your connection and try again.',
@@ -38,7 +42,15 @@ const errorBodySchema = z.object({
   success: z.literal(false),
   code: z.string(),
   requestId: z.string().optional(),
-  errors: z.array(z.object({ field: z.string().optional(), message: z.string() })).optional(),
+  errors: z
+    .array(
+      z.object({
+        field: z.string().optional(),
+        message: z.string(),
+        meta: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+      }),
+    )
+    .optional(),
 });
 
 type ApiErrorInit = {
@@ -80,10 +92,16 @@ function kindForStatus(status: number, unauthorizedKind: ApiErrorKind | undefine
 }
 
 function toFieldErrors(
-  errors: { field?: string | undefined; message: string }[] = [],
+  errors: {
+    field?: string | undefined;
+    message: string;
+    meta?: Record<string, string | number> | undefined;
+  }[] = [],
 ): FieldError[] {
-  return errors.flatMap(({ field, message }) =>
-    field ? [{ field: field.replace(/^(body|query|params)\./, ''), message }] : [],
+  return errors.flatMap(({ field, message, meta }) =>
+    field
+      ? [{ field: field.replace(/^(body|query|params)\./, ''), message, ...(meta && { meta }) }]
+      : [],
   );
 }
 
