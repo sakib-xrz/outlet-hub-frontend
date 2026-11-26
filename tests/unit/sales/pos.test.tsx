@@ -10,6 +10,7 @@ import { OutletPosPage } from '@/pages/outlets/outlet-pos-page';
 import { SaleDetailsPage } from '@/pages/outlets/sale-details-page';
 import { deferred, errorBody, failNetwork, respond } from '../../helpers/http';
 import { mockApi, ok, renderRoutes, signInAs } from '../../helpers/outlets';
+import { menuBody } from '../../helpers/outlet-menu';
 import {
   BURGER,
   MENU_PATH,
@@ -17,6 +18,7 @@ import {
   SALES_PATH,
   STAFF_ID,
   TEA,
+  products,
   routeSales,
   sale,
   saleResult,
@@ -124,6 +126,41 @@ describe('POS catalog and cart', () => {
     const input = screen.getByRole('searchbox', { name: /search products/i });
     await userEvent.keyboard('{Control>}k{/Control}');
     expect(document.activeElement).toBe(input);
+  });
+
+  it('stops auto-loading on page fetch failure, shows a retry button, and retries exactly once on click', async () => {
+    // First MENU_PATH request returns page 1 (with totalPages = 2). All subsequent requests fail.
+    let firstMenuRequest = true;
+    const requests = mockApi(
+      routeSales({
+        other: (config) => {
+          if (config.url !== MENU_PATH) return undefined;
+          if (firstMenuRequest) {
+            firstMenuRequest = false;
+            return ok(config, menuBody(products.slice(0, 1), /* total */ 101, /* page */ 1));
+          }
+          return failNetwork(config);
+        },
+      }),
+    );
+    renderRoutes(pageRoutes, POS_URL);
+
+    // Page-1 products visible
+    expect(await screen.findByText('Classic Burger')).toBeInTheDocument();
+
+    // Page-2 failure → retry button appears (and products from page 1 stay visible)
+    const retryBtn = await screen.findByRole('button', { name: 'Retry loading products' });
+    expect(retryBtn).toBeInTheDocument();
+    expect(screen.getByText('Classic Burger')).toBeInTheDocument();
+
+    // Exactly one page-2 request was made — no loop
+    const menuCount = () => requests.filter((r) => r.url === MENU_PATH).length;
+    expect(menuCount()).toBe(2); // 1 for page 1 + 1 for failed page 2
+
+    // Clicking retry fires exactly one more request
+    await userEvent.click(retryBtn);
+    await waitFor(() => expect(menuCount()).toBe(3));
+    expect(screen.getByRole('button', { name: 'Retry loading products' })).toBeInTheDocument();
   });
 
   it('adds, edits and removes lines with exact totals and stock limits', async () => {

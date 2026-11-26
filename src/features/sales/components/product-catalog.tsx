@@ -40,13 +40,13 @@ export function ProductCatalog({
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const catalog = useCatalog(outletId);
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = catalog;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError } = catalog;
 
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) {
+    if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError) {
       void fetchNextPage();
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const allProducts = useMemo(
     () =>
@@ -155,7 +155,7 @@ export function ProductCatalog({
             <Skeleton key={index} className="h-28 w-full" />
           ))}
         </div>
-      ) : catalog.isError ? (
+      ) : catalog.isError && !catalog.isFetchNextPageError ? (
         <ErrorState
           title="Products could not be loaded"
           description={catalog.error.message}
@@ -166,67 +166,84 @@ export function ProductCatalog({
           {search ? 'No products match your search.' : 'No products are available in this outlet.'}
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Products">
-          {products.map((product) => {
-            const inCart = quantities.get(product.menuItemId) ?? 0;
-            const outOfStock = product.stockQuantity < 1;
-            const atLimit = inCart >= product.stockQuantity;
-            const isDisabled = disabled || outOfStock || atLimit;
-            return (
-              <li key={product.menuItemId}>
-                <button
-                  type="button"
-                  aria-label={`Add ${product.name}, ${formatMoney(product.effectivePrice)}`}
-                  aria-disabled={isDisabled}
-                  className={[
-                    'relative flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
-                    'min-h-11',
-                    isDisabled
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:bg-accent',
-                  ].join(' ')}
-                  onClick={() => {
-                    if (!isDisabled)
-                      onAdd({
-                        menuItemId: product.menuItemId,
-                        sku: product.sku,
-                        name: product.name,
-                        unitPrice: product.effectivePrice,
-                        availableStock: product.stockQuantity,
-                      });
-                  }}
-                >
-                  {inCart > 0 && (
-                    <span
-                      className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
-                      aria-hidden
-                    >
-                      {inCart}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{product.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{product.sku}</p>
-                  </div>
-                  <div className="flex items-end justify-between gap-2">
-                    <div>
-                      <p className="font-semibold tabular-nums">
-                        {formatMoney(product.effectivePrice)}
-                      </p>
-                      {outOfStock ? (
-                        <p className="text-xs text-muted-foreground">Out of stock</p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {product.stockQuantity} in stock
-                        </p>
-                      )}
+        <>
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Products">
+            {products.map((product) => {
+              const inCart = quantities.get(product.menuItemId) ?? 0;
+              const outOfStock = product.stockQuantity < 1;
+              const atLimit = inCart >= product.stockQuantity;
+              const isDisabled = disabled || outOfStock || atLimit;
+              return (
+                <li key={product.menuItemId}>
+                  <button
+                    type="button"
+                    aria-label={`Add ${product.name}, ${formatMoney(product.effectivePrice)}`}
+                    aria-disabled={isDisabled}
+                    className={[
+                      'relative flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
+                      'min-h-11',
+                      isDisabled
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'cursor-pointer hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:bg-accent',
+                    ].join(' ')}
+                    onClick={() => {
+                      if (!isDisabled)
+                        onAdd({
+                          menuItemId: product.menuItemId,
+                          sku: product.sku,
+                          name: product.name,
+                          unitPrice: product.effectivePrice,
+                          availableStock: product.stockQuantity,
+                        });
+                    }}
+                  >
+                    {inCart > 0 && (
+                      <span
+                        className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground"
+                        aria-hidden
+                      >
+                        {inCart}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{product.name}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{product.sku}</p>
                     </div>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    <div className="flex items-end justify-between gap-2">
+                      <div>
+                        <p className="font-semibold tabular-nums">
+                          {formatMoney(product.effectivePrice)}
+                        </p>
+                        {outOfStock ? (
+                          <p className="text-xs text-muted-foreground">Out of stock</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {product.stockQuantity} in stock
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {isFetchNextPageError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 p-3 text-sm"
+            >
+              <p className="text-muted-foreground">Some products could not be loaded.</p>
+              <button
+                type="button"
+                className="shrink-0 font-medium underline-offset-2 hover:underline"
+                onClick={() => void fetchNextPage()}
+              >
+                Retry loading products
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
