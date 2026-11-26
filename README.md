@@ -800,7 +800,7 @@ Cache-Control: public, max-age=31536000, immutable   (/assets/*)
 Husky hooks live in `frontend/.husky`, mirroring `backend/.husky`. `pnpm install` runs `prepare: husky`, which installs them when `frontend/` is the Git repository root.
 
 - **pre-commit:** `lint-staged` (ESLint `--fix` and Prettier on staged files).
-- **commit-msg:** Commitlint with Conventional Commits.
+- **commit-msg:** Commitlint — enforces the commit message style (an imperative, sentence-case subject such as "Add inventory API", max 120 chars).
 
 ## Security decisions
 
