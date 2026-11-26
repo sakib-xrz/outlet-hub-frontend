@@ -95,3 +95,60 @@ describe('route guards', () => {
     expect(await screen.findByText('login /login')).toBeInTheDocument();
   });
 });
+
+describe('post-login redirect fallback', () => {
+  // Router with /dashboard open to all roles and /settings behind HQ_ADMIN guard.
+  function renderLoginRedirect(role: Role, redirectPath: string) {
+    authenticate(role);
+    const router = createMemoryRouter(
+      [
+        {
+          Component: PublicRoute,
+          children: [{ path: '/login', element: <LocationProbe label="login" /> }],
+        },
+        {
+          Component: ProtectedRoute,
+          children: [
+            { path: '/dashboard', element: <LocationProbe label="dashboard" /> },
+            {
+              element: <RoleGuard allow={['HQ_ADMIN']} />,
+              children: [{ path: '/settings', element: <LocationProbe label="settings" /> }],
+            },
+          ],
+        },
+        { path: '/unauthorized', element: <LocationProbe label="unauthorized" /> },
+      ],
+      { initialEntries: [`/login?redirect=${encodeURIComponent(redirectPath)}`] },
+    );
+    return render(<RouterProvider router={router} />);
+  }
+
+  beforeEach(() => useAuthStore.setState(useAuthStore.getInitialState(), true));
+
+  it('lands on /dashboard when the post-login redirect leads to a forbidden page', async () => {
+    renderLoginRedirect('OUTLET_STAFF', '/settings');
+    expect(await screen.findByText('dashboard /dashboard')).toBeInTheDocument();
+  });
+
+  it('still redirects to /unauthorized on direct navigation without fromLogin state', async () => {
+    authenticate('OUTLET_STAFF');
+    const router = createMemoryRouter(
+      [
+        {
+          Component: ProtectedRoute,
+          children: [
+            { path: '/dashboard', element: <LocationProbe label="dashboard" /> },
+            {
+              element: <RoleGuard allow={['HQ_ADMIN']} />,
+              children: [{ path: '/settings', element: <LocationProbe label="settings" /> }],
+            },
+          ],
+        },
+        { path: '/unauthorized', element: <LocationProbe label="unauthorized" /> },
+      ],
+      { initialEntries: ['/settings'] },
+    );
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText('unauthorized /unauthorized')).toBeInTheDocument();
+  });
+});

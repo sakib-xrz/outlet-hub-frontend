@@ -16,7 +16,16 @@ describe('getSafeRedirect', () => {
     'javascript:alert(1)',
     'dashboard',
     '/login',
+    '/unauthorized',
   ])('falls back for unsafe or looping target %s', (target) => {
     expect(getSafeRedirect(target)).toBe('/dashboard');
+  });
+
+  it('falls back for /unauthorized with a query string', () => {
+    expect(getSafeRedirect('/unauthorized?reason=forbidden')).toBe('/dashboard');
+  });
+
+  it('falls back for /unauthorized with a hash', () => {
+    expect(getSafeRedirect('/unauthorized#section')).toBe('/dashboard');
   });
 });
