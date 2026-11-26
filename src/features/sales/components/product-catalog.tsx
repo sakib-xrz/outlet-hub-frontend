@@ -121,7 +121,8 @@ export function ProductCatalog({
         />
         <input
           ref={inputRef}
-          type="search"
+          role="searchbox"
+          type="text"
           value={search}
           maxLength={100}
           placeholder="Search by name or SKU"
