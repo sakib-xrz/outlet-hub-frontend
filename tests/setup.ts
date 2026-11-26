@@ -34,6 +34,7 @@ Object.assign(Element.prototype, {
 
 Object.defineProperty(globalThis, 'ResizeObserver', {
   writable: true,
+  configurable: true,
   value: class ResizeObserver {
     observe(): undefined {
       return undefined;

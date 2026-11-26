@@ -1,36 +1,70 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Sale } from '@/features/sales/types/sale.types';
 import { formatDateTime } from '@/lib/utils/format';
 import { formatMoney } from '@/lib/utils/money';
 
-// Singleton <style> in document.head: added when the first Receipt mounts,
-// removed when the last one unmounts. ref-count handles concurrent instances.
-let receiptPrintStyleCount = 0;
-let receiptPrintStyleEl: HTMLStyleElement | null = null;
+// Singleton <style media="print"> in document.head.
+// Tracks the height of every mounted receipt and uses the tallest so the
+// @page height is always large enough for the longest receipt.
+let printStyleEl: HTMLStyleElement | null = null;
+const receiptHeights = new Map<Element, number>();
+
+const PX_TO_MM = 25.4 / 96;
+const SAFETY_MM = 2;
+const WIDTH_MM = 80;
+
+function writePrintStyle() {
+  if (!printStyleEl) return;
+  const maxH = receiptHeights.size > 0 ? Math.max(...receiptHeights.values()) : WIDTH_MM;
+  printStyleEl.textContent = `@page { size: ${WIDTH_MM}mm ${maxH.toFixed(1)}mm; margin: 0; }`;
+}
 
 function useReceiptPrintStyle() {
+  const articleRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
-    if (receiptPrintStyleCount === 0) {
-      receiptPrintStyleEl = document.createElement('style');
-      receiptPrintStyleEl.media = 'print';
-      receiptPrintStyleEl.textContent = '@page { size: 80mm auto; margin: 0; }';
-      document.head.appendChild(receiptPrintStyleEl);
+    const el = articleRef.current;
+    if (!el) return;
+
+    if (!printStyleEl) {
+      printStyleEl = document.createElement('style');
+      printStyleEl.media = 'print';
+      document.head.appendChild(printStyleEl);
     }
-    receiptPrintStyleCount += 1;
+
+    // Initial measurement; may be 0 in jsdom / before layout completes.
+    receiptHeights.set(el, el.getBoundingClientRect().height * PX_TO_MM + SAFETY_MM);
+    writePrintStyle();
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const hPx = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
+        receiptHeights.set(el, hPx * PX_TO_MM + SAFETY_MM);
+        writePrintStyle();
+      }
+    });
+    observer.observe(el);
+
     return () => {
-      receiptPrintStyleCount -= 1;
-      if (receiptPrintStyleCount === 0) {
-        receiptPrintStyleEl?.remove();
-        receiptPrintStyleEl = null;
+      observer.disconnect();
+      receiptHeights.delete(el);
+      if (receiptHeights.size === 0) {
+        printStyleEl?.remove();
+        printStyleEl = null;
+      } else {
+        writePrintStyle();
       }
     };
-  }, []);
+  }, []); // articleRef is a stable ref — intentionally omitted from deps
+
+  return articleRef;
 }
 
 export function Receipt({ sale, cashierLabel }: { sale: Sale; cashierLabel: string }) {
-  useReceiptPrintStyle();
+  const articleRef = useReceiptPrintStyle();
   return (
     <article
+      ref={articleRef}
       aria-labelledby="receipt-heading"
       data-print-receipt
       className="mx-auto w-[80mm] rounded-lg border bg-card p-[4mm] font-mono text-sm print:rounded-none print:border-0"

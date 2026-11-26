@@ -34,7 +34,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'pnpm --dir ../backend exec tsx src/server.ts',
+      command: 'pnpm --dir ../outlet-hub-backend exec tsx src/server.ts',
       url: `http://localhost:${API_PORT}/api/v1/health/ready`,
       reuseExistingServer: false,
       timeout: 120_000,
