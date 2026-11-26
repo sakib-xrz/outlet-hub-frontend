@@ -13,13 +13,65 @@ Web client for OutletHub, a multi-outlet POS management system. It contains:
 
 OutletHub records sales; it does not process payments.
 
-**Architecture, scaling, microservices and offline POS/KDS proposals:** [backend `docs/ARCHITECTURE.md`](../backend/docs/ARCHITECTURE.md). **Executed verification:** [backend `docs/VERIFICATION.md`](../backend/docs/VERIFICATION.md).
+The API lives in a separate repository, [outlet-hub-backend](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md). Its documentation covers the whole system:
+
+- [Backend README](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md): setup, API endpoints, database schema, architecture and the [Scaling Strategy](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md#scaling-strategy).
+- [docs/ARCHITECTURE.md](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/docs/ARCHITECTURE.md): the implemented architecture, plus the scaling, microservices and offline POS/KDS proposals.
+- [docs/VERIFICATION.md](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/docs/VERIFICATION.md): every executed check and its result.
+
+## Table of contents
+
+- [Stack](#stack)
+- [Architecture](#architecture)
+- [Structure](#structure)
+- [Local development](#local-development)
+- [Environment](#environment)
+- [Commands](#commands)
+- [Routing](#routing)
+- [Outlet management](#outlet-management)
+- [Staff management (HQ administrators only)](#staff-management-hq-administrators-only)
+- [Master menu (HQ administrators only)](#master-menu-hq-administrators-only)
+- [Outlet menu](#outlet-menu)
+- [Inventory](#inventory)
+- [POS, checkout and receipts](#pos-checkout-and-receipts)
+- [Dashboard and reports](#dashboard-and-reports)
+- [Authentication](#authentication)
+  - [Backend contract (verified against `backend/src`)](#backend-contract-verified-against-backendsrc)
+  - [Token lifecycle](#token-lifecycle)
+  - [Refresh coordination](#refresh-coordination)
+- [Data layer conventions](#data-layer-conventions)
+- [Design system](#design-system)
+- [Testing](#testing)
+  - [Browser end-to-end tests (Playwright, real backend and real PostgreSQL)](#browser-end-to-end-tests-playwright-real-backend-and-real-postgresql)
+  - [Manual smoke test (against a running backend)](#manual-smoke-test-against-a-running-backend)
+- [Docker](#docker)
+- [Coolify deployment (static SPA)](#coolify-deployment-static-spa)
+  - [Backend production values](#backend-production-values)
+  - [Recommended headers (configure in Coolify's proxy, for example Traefik header labels)](#recommended-headers-configure-in-coolifys-proxy-for-example-traefik-header-labels)
+- [Git hooks](#git-hooks)
+- [Security decisions](#security-decisions)
+- [Known limitations](#known-limitations)
 
 ## Stack
 
 React 19 · Vite 8 · TypeScript 6 (strict) · React Router 8 (data router) · Tailwind CSS 4 · shadcn/ui (Radix, `radix-vega`) · Lucide · TanStack Query 5 · Zustand 5 · React Hook Form 7 + Zod 4 · Axios · Sonner · Vitest 5 + React Testing Library · ESLint 10 · Prettier · Husky · lint-staged · Commitlint. Node 24 and pnpm 12, the same as the backend.
 
 TypeScript is pinned to 6.0 because `typescript-eslint` does not yet support TypeScript 7.
+
+## Architecture
+
+The frontend is a single-page application, built by Vite into static files and served by any static host: nginx in the [Docker image](#docker), or Coolify's static mode. It talks to the API only over HTTPS/JSON.
+
+- **Routing:** one route table (`src/app/router.tsx`) with lazy-loaded pages and `ProtectedRoute`, `PublicRoute` and `RoleGuard` guards. Guards are UX only; the API enforces every rule.
+- **Server state:** TanStack Query with a query-key factory per feature. Mutations invalidate exactly the keys they affect; a completed sale refreshes that outlet's sales, menu and inventory, plus all reports. The cache is cleared when the session ends.
+- **Client state:** Zustand.
+  - The session lives in memory only; refresh goes through the httpOnly cookie, with single-flight coordination across requests and tabs.
+  - The POS cart is keyed by `userId:outletId`.
+  - Theme and sidebar preferences are persisted.
+- **Contracts:** every API response is parsed with Zod before use. Money stays an exact string, and arithmetic uses BigInt minor units, never floats.
+- **Checkout safety:** each sale gets a client-generated request id. The frozen payload is saved before the single `POST`, and uncertain outcomes are resolved with the same id (check status, or retry the same sale).
+
+The system-wide architecture is documented in the backend repository: the API layers, the transaction and lock order, and the data model. See [docs/ARCHITECTURE.md](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/docs/ARCHITECTURE.md). How the system grows to 10 outlets and 100,000 transactions per month is in the backend README's [Scaling Strategy](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md#scaling-strategy).
 
 ## Structure
 
@@ -612,7 +664,7 @@ All HTTP traffic is mocked. `tests/setup.ts` replaces Axios's default adapter so
 
 ### Browser end-to-end tests (Playwright, real backend and real PostgreSQL)
 
-`e2e/business-flow.spec.ts` drives Chromium through the essential flows **without any mocked API**. `playwright.config.ts` starts the real backend (`../backend`, port 3100) and the Vite dev server (port 5174), connected to a **local, disposable, migrated** PostgreSQL. The config refuses any non-local database URL.
+`e2e/business-flow.spec.ts` drives Chromium through the essential flows **without any mocked API**. `playwright.config.ts` starts the real backend, which it expects as a sibling checkout of [outlet-hub-backend](https://github.com/sakib-xrz/outlet-hub-backend) at `../backend`, on port 3100 and the Vite dev server (port 5174), connected to a **local, disposable, migrated** PostgreSQL. The config refuses any non-local database URL.
 
 1. Signed-out access to `/dashboard` redirects to login.
 2. HQ signs in and sees the dashboard. Through the UI, HQ creates an outlet and two menu items, assigns them to the outlet, adds stock, and creates a staff account assigned to the outlet.
@@ -641,6 +693,51 @@ Run this only with approval; it writes refresh sessions to the shared database.
 6. Reload `/dashboard`. The session restores with one `/auth/refresh` call and protected content does not flash.
 7. Open a second tab, then sign out in one tab. The other tab signs out too.
 8. With the backend stopped, reload. You see "Could not restore your session" with a Retry button, and the session hint is kept.
+
+## Docker
+
+The image is a multi-stage build:
+
+1. **Build stage:** `node:24.22.3-bookworm-slim` with pnpm 12.23.0, the same pins as the backend. It runs `pnpm install --frozen-lockfile` with a pnpm store cache mount, then `pnpm build`.
+2. **Runtime stage:** `nginxinc/nginx-unprivileged:1.28-alpine`, running as a non-root user (uid 101) on port 8080. It serves `dist/` only; no Node.js and no source code are in the final image.
+
+`VITE_API_BASE_URL` is the only variable the build needs (see `src/config/env-schema.ts`). It is a **build argument**, because Vite compiles it into the bundle.
+
+- **Missing value:** the build stops with an explicit "Missing build argument VITE_API_BASE_URL" message.
+- **Invalid value:** the build fails with the same validation `pnpm build` uses: an absolute URL ending in `/api/v1`, with no credentials, query string or fragment, and `https` unless the host is `localhost`.
+- **Changing the URL:** requires a rebuild.
+
+The same value's origin is written into the CSP `connect-src` at build time, so the browser may only call that API.
+
+```bash
+# Local API on http://localhost:3000 (the default)
+docker compose up -d --build                     # SPA on http://127.0.0.1:${WEB_PORT:-8080}
+
+# Any other API
+VITE_API_BASE_URL=https://api.example.com/api/v1 WEB_PORT=8080 docker compose up -d --build
+
+docker compose ps                                # health: healthy
+docker compose down
+```
+
+**Compose:** `docker-compose.yml` has one service, `web`. It publishes on loopback only and restarts `unless-stopped`. It contains **no database or API service**:
+
+- The API has its own Compose file in [outlet-hub-backend](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md#full-stack-with-docker-api--frontend-external-database).
+- PostgreSQL is the external Coolify-managed database and stays outside Docker.
+- For the full stack, the API's `ALLOWED_ORIGINS` must contain the SPA's exact origin (for example `http://localhost:8080`).
+
+**nginx** (`nginx/default.conf`):
+
+- **SPA fallback:** `try_files $uri $uri/ /index.html`, so a reload on `/dashboard` or `/outlets/:id/pos` returns the app. A missing file under `/assets/` is a real `404`, never `index.html`.
+- **Caching:** hashed files under `/assets/` get `Cache-Control: public, max-age=31536000, immutable`. `index.html` and other unhashed files get `no-cache`, so a deploy is picked up on the next load.
+- **Compression:** gzip for text, JavaScript, CSS, JSON and SVG.
+- **Security headers:** the [recommended headers](#recommended-headers-configure-in-coolifys-proxy-for-example-traefik-header-labels) below, on every page and asset, from `nginx/security-headers.conf.template`.
+  - The CSP keeps `script-src 'self'`; `public/theme-init.js` is an external file, so it needs no inline allowance. It also keeps `style-src 'unsafe-inline'` for Radix and Sonner.
+  - Fonts are bundled, so `font-src 'self'` is enough.
+  - HSTS only takes effect once the site is served over HTTPS, for example behind Coolify's Traefik.
+- **Health:** `GET /healthz` returns `200 ok` and is not logged. The image's `HEALTHCHECK` calls it every 30 seconds.
+
+`.dockerignore` keeps `node_modules`, `dist`, `.git`, env files, tests, Playwright reports and other local artifacts out of the build context.
 
 ## Coolify deployment (static SPA)
 
@@ -677,6 +774,8 @@ TRUST_PROXY=1
 Put the frontend and API on subdomains of one registrable domain. They are then the same site, and the `Strict` host-only refresh cookie on `api.example.com` is sent with credentialed requests. Separate sites would need `COOKIE_SAME_SITE=none`, and browsers that block third-party cookies would then break session restore, so avoid that. Avoid Coolify's generated `sslip.io` hostnames for the same reason.
 
 ### Recommended headers (configure in Coolify's proxy, for example Traefik header labels)
+
+The Docker image's nginx already sends these headers; see [Docker](#docker). Configure them in the proxy only when you use Coolify's static-site mode instead of the image.
 
 ```text
 Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.example.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
