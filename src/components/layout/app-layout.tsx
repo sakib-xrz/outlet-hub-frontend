@@ -20,7 +20,7 @@ export function AppLayout() {
           Skip to content
         </a>
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="min-w-0">
           <AppHeader />
           {navigating && (
             <div
@@ -29,7 +29,7 @@ export function AppLayout() {
               className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary/70"
             />
           )}
-          <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 outline-none">
             <Outlet />
           </main>
         </SidebarInset>
