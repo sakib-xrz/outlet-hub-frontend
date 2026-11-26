@@ -57,7 +57,7 @@ export function ReportDateFilter({
 
   return (
     <section aria-label="Reporting period" className="flex flex-col gap-3 rounded-lg border p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-wrap gap-3 md:flex-row md:items-center md:justify-between">
         <div role="group" aria-label="Period presets" className="flex flex-wrap gap-1.5">
           {REPORT_PERIODS.map((period) => (
             <Button
