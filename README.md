@@ -103,11 +103,11 @@ Dependencies flow one way: `pages → features/components → lib/config`. Nothi
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example .env.development      # VITE_API_BASE_URL=http://localhost:3000/api/v1
+cp .env.example .env.development      # VITE_API_BASE_URL=http://localhost:8000/api/v1
 pnpm dev                              # http://localhost:5173 (strict port)
 ```
 
-Run the backend on port 3000 with these values in `backend/.env.development`:
+Run the backend on port 8000 with these values in `backend/.env.development`:
 
 ```dotenv
 ALLOWED_ORIGINS=http://localhost:5173
@@ -699,7 +699,7 @@ Run this only with approval; it writes refresh sessions to the shared database.
 The image is a multi-stage build:
 
 1. **Build stage:** `node:24.22.3-bookworm-slim` with pnpm 12.23.0, the same pins as the backend. It runs `pnpm install --frozen-lockfile` with a pnpm store cache mount, then `pnpm build`.
-2. **Runtime stage:** `nginxinc/nginx-unprivileged:1.28-alpine`, running as a non-root user (uid 101) on port 8080. It serves `dist/` only; no Node.js and no source code are in the final image.
+2. **Runtime stage:** `nginxinc/nginx-unprivileged:1.28-alpine`, running as a non-root user (uid 101) on port 5173. It serves `dist/` only; no Node.js and no source code are in the final image.
 
 `VITE_API_BASE_URL` is the only variable the build needs (see `src/config/env-schema.ts`). It is a **build argument**, because Vite compiles it into the bundle.
 
@@ -710,11 +710,11 @@ The image is a multi-stage build:
 The same value's origin is written into the CSP `connect-src` at build time, so the browser may only call that API.
 
 ```bash
-# Local API on http://localhost:3000 (the default)
-docker compose up -d --build                     # SPA on http://127.0.0.1:${WEB_PORT:-8080}
+# Local API on http://localhost:8000 (the default)
+docker compose up -d --build                     # SPA on http://127.0.0.1:${WEB_PORT:-5173}
 
 # Any other API
-VITE_API_BASE_URL=https://api.example.com/api/v1 WEB_PORT=8080 docker compose up -d --build
+VITE_API_BASE_URL=https://api.example.com/api/v1 WEB_PORT=5173 docker compose up -d --build
 
 docker compose ps                                # health: healthy
 docker compose down
@@ -724,7 +724,7 @@ docker compose down
 
 - The API has its own Compose file in [outlet-hub-backend](https://github.com/sakib-xrz/outlet-hub-backend/blob/main/README.md#full-stack-with-docker-api--frontend-external-database).
 - PostgreSQL is the external Coolify-managed database and stays outside Docker.
-- For the full stack, the API's `ALLOWED_ORIGINS` must contain the SPA's exact origin (for example `http://localhost:8080`).
+- For the full stack, the API's `ALLOWED_ORIGINS` must contain the SPA's exact origin (for example `http://localhost:5173`).
 
 **nginx** (`nginx/default.conf`):
 
@@ -763,7 +763,7 @@ SPA fallback must serve `index.html` for unknown paths, so a reload on `/dashboa
 
 ### Alternative: Dockerfile build pack
 
-You can also deploy using Coolify's **Dockerfile** build pack instead of Nixpacks. Set the build pack to "Dockerfile", the published port to `8080`, and the health check path to `/healthz`. Coolify will build the image from this repository's `Dockerfile` and run the nginx container directly.
+You can also deploy using Coolify's **Dockerfile** build pack instead of Nixpacks. Set the build pack to "Dockerfile", the published port to `5173`, and the health check path to `/healthz`. Coolify will build the image from this repository's `Dockerfile` and run the nginx container directly.
 
 `VITE_API_BASE_URL` must be set as a **build-time** variable (not a runtime env var). Vite compiles it into the JavaScript bundle and it is also written into the nginx `Content-Security-Policy` `connect-src` directive at image build time, so changing it requires a full rebuild and redeploy.
 
