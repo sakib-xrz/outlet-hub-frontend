@@ -31,7 +31,7 @@ function StaffTableHeader() {
 
 export function StaffTable({ staff }: { staff: StaffSummary[] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="min-w-0 overflow-x-auto rounded-lg border">
       <Table>
         <StaffTableHeader />
         <TableBody>
@@ -65,7 +65,11 @@ export function StaffTable({ staff }: { staff: StaffSummary[] }) {
 
 export function StaffTableSkeleton() {
   return (
-    <div className="overflow-x-auto rounded-lg border" role="status" aria-label="Loading staff">
+    <div
+      className="min-w-0 overflow-x-auto rounded-lg border"
+      role="status"
+      aria-label="Loading staff"
+    >
       <Table>
         <StaffTableHeader />
         <TableBody>

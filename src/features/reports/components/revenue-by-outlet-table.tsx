@@ -69,7 +69,7 @@ export function RevenueByOutletTable({
         ) : (
           <>
             <RevenueByOutletChart items={data.items} />
-            <div className="overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

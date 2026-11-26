@@ -34,7 +34,7 @@ function OutletTableHeader() {
 
 export function OutletTable({ outlets, canManage }: { outlets: Outlet[]; canManage: boolean }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="min-w-0 overflow-x-auto rounded-lg border">
       <Table>
         <OutletTableHeader />
         <TableBody>
@@ -71,7 +71,11 @@ export function OutletTable({ outlets, canManage }: { outlets: Outlet[]; canMana
 
 export function OutletTableSkeleton() {
   return (
-    <div className="overflow-x-auto rounded-lg border" role="status" aria-label="Loading outlets">
+    <div
+      className="min-w-0 overflow-x-auto rounded-lg border"
+      role="status"
+      aria-label="Loading outlets"
+    >
       <Table>
         <OutletTableHeader />
         <TableBody>

@@ -155,7 +155,7 @@ export function OutletSalesPage() {
         />
       ) : (
         <div className="flex flex-col gap-4" aria-busy={sales.isFetching}>
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="min-w-0 overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>

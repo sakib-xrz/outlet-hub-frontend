@@ -31,7 +31,7 @@ export function OutletMenuTable({
   canManage: boolean;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="min-w-0 overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
