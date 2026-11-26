@@ -10,7 +10,13 @@ export function PublicRoute() {
 
   if (status === 'initializing') return <FullPageLoader label="Restoring your session" />;
   if (status === 'authenticated') {
-    return <Navigate to={getSafeRedirect(searchParams.get(REDIRECT_PARAM))} replace />;
+    return (
+      <Navigate
+        to={getSafeRedirect(searchParams.get(REDIRECT_PARAM))}
+        replace
+        state={{ fromLogin: true }}
+      />
+    );
   }
   return <Outlet />;
 }

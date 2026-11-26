@@ -23,6 +23,7 @@ export function getSafeRedirect(
   } catch {
     return fallback;
   }
-  if (url.origin !== INTERNAL_ORIGIN || url.pathname === ROUTES.login) return fallback;
+  const blocked = new Set<string>([ROUTES.login, ROUTES.unauthorized]);
+  if (url.origin !== INTERNAL_ORIGIN || blocked.has(url.pathname)) return fallback;
   return `${url.pathname}${url.search}${url.hash}`;
 }
