@@ -1,8 +1,34 @@
+import { useEffect } from 'react';
 import type { Sale } from '@/features/sales/types/sale.types';
 import { formatDateTime } from '@/lib/utils/format';
 import { formatMoney } from '@/lib/utils/money';
 
+// Singleton <style> in document.head: added when the first Receipt mounts,
+// removed when the last one unmounts. ref-count handles concurrent instances.
+let receiptPrintStyleCount = 0;
+let receiptPrintStyleEl: HTMLStyleElement | null = null;
+
+function useReceiptPrintStyle() {
+  useEffect(() => {
+    if (receiptPrintStyleCount === 0) {
+      receiptPrintStyleEl = document.createElement('style');
+      receiptPrintStyleEl.media = 'print';
+      receiptPrintStyleEl.textContent = '@page { size: 80mm auto; margin: 0; }';
+      document.head.appendChild(receiptPrintStyleEl);
+    }
+    receiptPrintStyleCount += 1;
+    return () => {
+      receiptPrintStyleCount -= 1;
+      if (receiptPrintStyleCount === 0) {
+        receiptPrintStyleEl?.remove();
+        receiptPrintStyleEl = null;
+      }
+    };
+  }, []);
+}
+
 export function Receipt({ sale, cashierLabel }: { sale: Sale; cashierLabel: string }) {
+  useReceiptPrintStyle();
   return (
     <article
       aria-labelledby="receipt-heading"
