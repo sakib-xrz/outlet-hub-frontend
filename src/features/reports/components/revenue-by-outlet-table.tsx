@@ -69,53 +69,55 @@ export function RevenueByOutletTable({
         ) : (
           <>
             <RevenueByOutletChart items={data.items} />
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Outlet</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Sales</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((row) => (
-                  <TableRow key={row.outletId}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{row.outletName}</span>
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {row.outletCode}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge isActive={row.isActive} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCount(row.totalSales)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.totalRevenue)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-pressed={selectedOutletId === row.outletId}
-                        aria-label={`Show top items for ${row.outletName}`}
-                        onClick={() => onSelectOutlet(row.outletId)}
-                      >
-                        Top items
-                      </Button>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Outlet</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Sales</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {data.items.map((row) => (
+                    <TableRow key={row.outletId}>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{row.outletName}</span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {row.outletCode}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge isActive={row.isActive} />
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCount(row.totalSales)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(row.totalRevenue)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-pressed={selectedOutletId === row.outletId}
+                          aria-label={`Show top items for ${row.outletName}`}
+                          onClick={() => onSelectOutlet(row.outletId)}
+                        >
+                          Top items
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
             <PaginationBar
               label="Revenue by outlet pages"
               pagination={data.pagination}
