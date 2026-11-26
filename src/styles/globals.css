@@ -146,6 +146,16 @@
     display: none !important;
   }
 
+  /* When a receipt is present (e.g. POS post-checkout), remove page chrome so
+     the receipt starts at the top of the page and no blank page 1 is generated. */
+  body:has([data-print-receipt]) [data-slot='page-container'] {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  body:has([data-print-receipt]) [data-slot='page-container-header'] {
+    display: none !important;
+  }
+
   [data-slot='sidebar-inset'] {
     margin: 0 !important;
   }
