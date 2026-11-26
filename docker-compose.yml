@@ -1,0 +1,14 @@
+name: outlet-hub-frontend
+
+# Static SPA served by nginx. The API and its PostgreSQL database run elsewhere;
+# this file intentionally contains no database service.
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api/v1}
+    image: outlet-hub-frontend:latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${WEB_PORT:-8080}:8080'
