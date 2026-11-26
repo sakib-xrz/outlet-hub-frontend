@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 async function addToCart(name: string, times = 1): Promise<void> {
-  const button = await screen.findByRole('button', { name: `Add ${name} to cart` });
+  const button = await screen.findByRole('button', { name: new RegExp(`Add ${name},`) });
   for (let index = 0; index < times; index += 1) await userEvent.click(button);
 }
 
@@ -57,18 +57,73 @@ async function checkout(): Promise<void> {
 }
 
 describe('POS catalog and cart', () => {
-  it('loads only this outlet’s active menu and disables out-of-stock products', async () => {
+  it("loads only this outlet's active menu, all pages, and disables out-of-stock products", async () => {
     const requests = mockApi(routeSales());
     renderRoutes(pageRoutes, POS_URL);
 
     expect(await screen.findByText('Classic Burger')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add Apple Pie to cart' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Add Apple Pie,/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(requests.find((r) => r.url === MENU_PATH)?.params).toMatchObject({ status: 'active' });
     expect(requests.some((r) => r.url === '/menu-items')).toBe(false);
+  });
+
+  it('filters the catalog client-side by name and SKU without a new request', async () => {
+    const requests = mockApi(routeSales());
+    renderRoutes(pageRoutes, POS_URL);
+
+    await screen.findByText('Classic Burger');
+    const countBefore = requests.filter((r) => r.url === MENU_PATH).length;
 
     await userEvent.type(screen.getByRole('searchbox', { name: /search products/i }), 'tea');
     expect(await screen.findByText('Masala Tea')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Classic Burger')).not.toBeInTheDocument());
+
+    expect(requests.filter((r) => r.url === MENU_PATH).length).toBe(countBefore);
+  });
+
+  it('clears search with the X button and focuses the input', async () => {
+    mockApi(routeSales());
+    renderRoutes(pageRoutes, POS_URL);
+    await screen.findByText('Classic Burger');
+
+    const input = screen.getByRole('searchbox', { name: /search products/i });
+    await userEvent.type(input, 'tea');
+    await waitFor(() => expect(screen.queryByText('Classic Burger')).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(await screen.findByText('Classic Burger')).toBeInTheDocument();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('focuses search with the / shortcut and clears with Esc', async () => {
+    mockApi(routeSales());
+    renderRoutes(pageRoutes, POS_URL);
+    await screen.findByText('Classic Burger');
+
+    const input = screen.getByRole('searchbox', { name: /search products/i });
+
+    await userEvent.keyboard('/');
+    expect(document.activeElement).toBe(input);
+
+    await userEvent.type(input, 'tea');
+    await waitFor(() => expect(screen.queryByText('Classic Burger')).not.toBeInTheDocument());
+
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByText('Classic Burger')).toBeInTheDocument();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('focuses search with Ctrl+K', async () => {
+    mockApi(routeSales());
+    renderRoutes(pageRoutes, POS_URL);
+    await screen.findByText('Classic Burger');
+
+    const input = screen.getByRole('searchbox', { name: /search products/i });
+    await userEvent.keyboard('{Control>}k{/Control}');
+    expect(document.activeElement).toBe(input);
   });
 
   it('adds, edits and removes lines with exact totals and stock limits', async () => {
@@ -78,7 +133,10 @@ describe('POS catalog and cart', () => {
     expect(screen.getByLabelText('Cart total')).toHaveTextContent('৳0.30');
 
     await addToCart('Classic Burger', 5);
-    expect(screen.getByRole('button', { name: 'Add Classic Burger to cart' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Add Classic Burger,/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(screen.getByLabelText('Cart total')).toHaveTextContent('৳1,250.30');
 
     await userEvent.click(screen.getByRole('button', { name: 'Decrease Classic Burger' }));
@@ -172,7 +230,10 @@ describe('checkout', () => {
     const stored = JSON.parse(sessionStorage.getItem(PENDING_KEY) ?? '{}') as { requestId: string };
     expect(stored.requestId).toBe(posts(requests)[0]?.requestId);
     expect(screen.queryByRole('button', { name: 'Checkout' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add Masala Tea to cart' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Add Masala Tea,/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'Retry same sale' }));
     expect(
@@ -370,5 +431,14 @@ describe('POS access and receipts', () => {
     expect(within(receipt).getByLabelText('Receipt total')).toHaveTextContent('৳500.30');
     await userEvent.click(screen.getByRole('button', { name: 'Print receipt' }));
     expect(print).toHaveBeenCalledOnce();
+  });
+
+  it('receipt has 80mm width class and data-print-receipt attribute', async () => {
+    mockApi(routeSales());
+    renderRoutes(pageRoutes, `/outlets/${OUTLET.id}/sales/${sale().id}`);
+
+    const receipt = await screen.findByRole('article');
+    expect(receipt).toHaveAttribute('data-print-receipt');
+    expect(receipt.className).toMatch(/w-\[80mm\]/);
   });
 });

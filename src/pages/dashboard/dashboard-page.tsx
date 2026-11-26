@@ -15,7 +15,6 @@ export function DashboardPage() {
           ? 'Company revenue, sales and best sellers across all outlets.'
           : 'Jump into the outlets you work at.'
       }
-      {...(isHq && { className: 'max-w-7xl' })}
     >
       {user && (isHq ? <HqDashboard /> : <StaffDashboard />)}
     </PageContainer>

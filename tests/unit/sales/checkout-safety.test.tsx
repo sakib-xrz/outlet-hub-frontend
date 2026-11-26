@@ -65,9 +65,7 @@ describe('pending checkout storage failure', () => {
       throw new DOMException('Quota exceeded', 'QuotaExceededError');
     });
     renderRoutes(pageRoutes, POS_URL);
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Add Classic Burger to cart' }),
-    );
+    await userEvent.click(await screen.findByRole('button', { name: /Add Classic Burger,/ }));
     await checkout();
 
     expect(await screen.findByText(/could not save the checkout safely/)).toBeInTheDocument();

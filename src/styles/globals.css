@@ -134,6 +134,11 @@
 }
 
 @media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
   [data-slot='sidebar'],
   [data-slot='sidebar-gap'],
   [data-slot='sidebar-inset'] > header,
@@ -148,5 +153,19 @@
   body {
     background: white;
     color: black;
+  }
+
+  [data-print-receipt] {
+    width: 100%;
+    padding: 4mm;
+    color: black;
+    background: white;
+    border: none;
+    border-radius: 0;
+  }
+
+  [data-print-receipt] * {
+    color: black !important;
+    background: transparent !important;
   }
 }

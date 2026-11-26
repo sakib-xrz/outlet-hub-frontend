@@ -7,25 +7,25 @@ export function Receipt({ sale, cashierLabel }: { sale: Sale; cashierLabel: stri
     <article
       aria-labelledby="receipt-heading"
       data-print-receipt
-      className="mx-auto w-full max-w-sm rounded-lg border bg-card p-5 font-mono text-sm print:max-w-none print:border-0 print:p-0"
+      className="mx-auto w-[80mm] rounded-lg border bg-card p-[4mm] font-mono text-sm print:rounded-none print:border-0"
     >
       <header className="mb-3 text-center">
         <p className="font-sans text-base font-semibold">{sale.outletName}</p>
-        <p className="text-xs text-muted-foreground">{sale.outletCode}</p>
+        <p className="text-xs text-muted-foreground print:text-black">{sale.outletCode}</p>
       </header>
       <dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-        <dt className="text-muted-foreground">Receipt</dt>
+        <dt className="text-muted-foreground print:text-black">Receipt</dt>
         <dd id="receipt-heading" className="text-right font-semibold">
           {sale.receiptCode}
         </dd>
-        <dt className="text-muted-foreground">Date</dt>
+        <dt className="text-muted-foreground print:text-black">Date</dt>
         <dd className="text-right">{formatDateTime(sale.createdAt)}</dd>
-        <dt className="text-muted-foreground">Cashier</dt>
+        <dt className="text-muted-foreground print:text-black">Cashier</dt>
         <dd className="text-right">{cashierLabel}</dd>
       </dl>
       <table className="w-full border-y border-dashed text-xs">
         <thead>
-          <tr className="text-muted-foreground">
+          <tr className="text-muted-foreground print:text-black">
             <th scope="col" className="py-1 text-left font-normal">
               Item
             </th>
@@ -43,7 +43,7 @@ export function Receipt({ sale, cashierLabel }: { sale: Sale; cashierLabel: stri
         <tbody>
           {sale.items.map((item) => (
             <tr key={item.menuItemId} className="align-top">
-              <td className="py-1 pr-2 break-words">{item.itemName}</td>
+              <td className="py-1 pr-2 wrap-break-word">{item.itemName}</td>
               <td className="py-1 text-right tabular-nums">{item.quantity}</td>
               <td className="py-1 text-right tabular-nums">{formatMoney(item.unitPrice)}</td>
               <td className="py-1 text-right tabular-nums">{formatMoney(item.lineTotal)}</td>
@@ -57,7 +57,7 @@ export function Receipt({ sale, cashierLabel }: { sale: Sale; cashierLabel: stri
           {formatMoney(sale.totalAmount)}
         </span>
       </p>
-      <p className="mt-4 text-center text-xs text-muted-foreground">Thank you</p>
+      <p className="mt-4 text-center text-xs text-muted-foreground print:text-black">Thank you</p>
     </article>
   );
 }

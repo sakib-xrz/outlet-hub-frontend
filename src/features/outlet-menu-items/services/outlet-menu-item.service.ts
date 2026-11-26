@@ -25,12 +25,13 @@ export const outletMenuItemService = {
     outletId: string,
     filters: OutletMenuFilters,
     signal?: AbortSignal,
+    limitOverride?: number,
   ): Promise<OutletMenuPage> {
     const { sortBy, sortOrder } = OUTLET_MENU_SORT_OPTIONS[filters.sort];
     const response = await apiClient.get(menuPath(outletId), {
       params: {
         page: filters.page,
-        limit: OUTLET_MENU_PAGE_SIZE,
+        limit: limitOverride ?? OUTLET_MENU_PAGE_SIZE,
         status: filters.status,
         sortBy,
         sortOrder,

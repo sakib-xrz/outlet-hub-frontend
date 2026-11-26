@@ -472,7 +472,7 @@ The code lives in `src/features/sales/`, with pages `outlet-pos-page.tsx`, `outl
 
 - Shows outlet name and code, receipt code, date and time, cashier (your email, or a staff id prefix), lines with quantity, unit price and line total, and the total in BDT. Every value comes from the stored sale snapshot.
 - The completed-sale view offers **Print receipt**, **View sale details** and **Start new sale**.
-- Printing uses `window.print()`. A print stylesheet in `globals.css` hides the sidebar, header and every `[data-print-hide]` control. There is no PDF or printer integration.
+- Printing uses `window.print()`. A print stylesheet in `globals.css` hides the sidebar, header and every `[data-print-hide]` control, and sets `@page { size: 80mm auto; margin: 0 }` for 80 mm thermal paper. The on-screen receipt is rendered at the same 80 mm width for WYSIWYG preview. **If your driver ignores the `@page` size**, choose _80mm × Roll_ (or the nearest 80 mm paper) in the browser's print dialog before printing. There is no PDF or printer integration.
 
 **Sales history:**
 

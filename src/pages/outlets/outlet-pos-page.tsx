@@ -207,7 +207,6 @@ export function OutletPosPage() {
     <PageContainer
       title={data ? `${data.name} · POS` : 'Point of sale'}
       description={data ? `Outlet ${data.code}` : 'Loading outlet…'}
-      className="max-w-7xl"
       actions={
         <div className="flex flex-wrap gap-2" data-print-hide>
           <Button asChild variant="outline">
