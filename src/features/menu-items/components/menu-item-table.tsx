@@ -33,7 +33,7 @@ function MenuItemTableHeader() {
 
 export function MenuItemTable({ items }: { items: MenuItem[] }) {
   return (
-    <div className="rounded-lg border">
+    <div className="overflow-x-auto rounded-lg border">
       <Table>
         <MenuItemTableHeader />
         <TableBody>
@@ -70,7 +70,11 @@ export function MenuItemTable({ items }: { items: MenuItem[] }) {
 
 export function MenuItemTableSkeleton() {
   return (
-    <div className="rounded-lg border" role="status" aria-label="Loading menu items">
+    <div
+      className="overflow-x-auto rounded-lg border"
+      role="status"
+      aria-label="Loading menu items"
+    >
       <Table>
         <MenuItemTableHeader />
         <TableBody>
