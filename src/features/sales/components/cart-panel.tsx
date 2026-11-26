@@ -44,7 +44,7 @@ function QuantityInput({
   }
   return (
     <Input
-      className="h-8 w-16 text-center tabular-nums"
+      className="h-8 w-16 text-center tabular-nums max-lg:h-11"
       inputMode="numeric"
       aria-label={label}
       value={draft}
@@ -145,6 +145,7 @@ export function CartPanel({
                 <Button
                   variant="outline"
                   size="icon-sm"
+                  className="max-lg:size-11"
                   aria-label={`Decrease ${line.name}`}
                   disabled={submitting || line.quantity <= 1}
                   onClick={() => onQuantity(line.menuItemId, line.quantity - 1)}
@@ -160,6 +161,7 @@ export function CartPanel({
                 <Button
                   variant="outline"
                   size="icon-sm"
+                  className="max-lg:size-11"
                   aria-label={`Increase ${line.name}`}
                   disabled={submitting || line.quantity >= line.availableStock}
                   onClick={() => onQuantity(line.menuItemId, line.quantity + 1)}
@@ -169,7 +171,7 @@ export function CartPanel({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="ml-auto"
+                  className="ml-auto max-lg:size-11"
                   aria-label={`Remove ${line.name}`}
                   disabled={submitting}
                   onClick={() => onRemove(line.menuItemId)}

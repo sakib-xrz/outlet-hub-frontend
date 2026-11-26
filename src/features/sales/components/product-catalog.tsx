@@ -123,6 +123,7 @@ export function ProductCatalog({
                   </div>
                   <Button
                     size="sm"
+                    className="max-lg:h-11"
                     disabled={disabled || outOfStock || atLimit}
                     aria-label={`Add ${product.name} to cart`}
                     onClick={() =>
