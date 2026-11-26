@@ -133,11 +133,6 @@
   }
 }
 
-@page receipt {
-  size: 80mm auto;
-  margin: 0;
-}
-
 @media print {
   [data-slot='sidebar'],
   [data-slot='sidebar-gap'],
@@ -166,7 +161,6 @@
   }
 
   [data-print-receipt] {
-    page: receipt;
     width: 100%;
     padding: 4mm;
     color: black;

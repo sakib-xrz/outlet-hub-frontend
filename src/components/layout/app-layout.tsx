@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, useNavigation } from 'react-router';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -5,10 +6,32 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { usePreferencesStore } from '@/stores/preferences.store';
 
+const RECEIPT_STYLE_ID = 'receipt-page-size';
+
 export function AppLayout() {
   const sidebarOpen = usePreferencesStore((state) => state.sidebarOpen);
   const setSidebarOpen = usePreferencesStore((state) => state.setSidebarOpen);
   const navigating = useNavigation().state === 'loading';
+
+  useEffect(() => {
+    function handleBeforePrint() {
+      if (document.querySelector('[data-print-receipt]')) {
+        const style = document.createElement('style');
+        style.id = RECEIPT_STYLE_ID;
+        style.textContent = '@page { size: 80mm auto; margin: 0; }';
+        document.head.appendChild(style);
+      }
+    }
+    function handleAfterPrint() {
+      document.getElementById(RECEIPT_STYLE_ID)?.remove();
+    }
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
 
   return (
     <TooltipProvider delayDuration={300}>
