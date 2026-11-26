@@ -761,6 +761,12 @@ The build needs devDependencies (Vite, TypeScript). If the install skips them be
 
 SPA fallback must serve `index.html` for unknown paths, so a reload on `/dashboard` works. Coolify's static SPA mode provides this; `vite preview` must not be used in production.
 
+### Alternative: Dockerfile build pack
+
+You can also deploy using Coolify's **Dockerfile** build pack instead of Nixpacks. Set the build pack to "Dockerfile", the published port to `8080`, and the health check path to `/healthz`. Coolify will build the image from this repository's `Dockerfile` and run the nginx container directly.
+
+`VITE_API_BASE_URL` must be set as a **build-time** variable (not a runtime env var). Vite compiles it into the JavaScript bundle and it is also written into the nginx `Content-Security-Policy` `connect-src` directive at image build time, so changing it requires a full rebuild and redeploy.
+
 ### Backend production values
 
 ```dotenv
