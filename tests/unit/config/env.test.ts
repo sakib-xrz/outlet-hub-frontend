@@ -6,8 +6,8 @@ const parse = (value: unknown, production = false) =>
 
 describe('parseClientEnv', () => {
   it('normalizes trailing slashes', () => {
-    expect(parse('http://localhost:3000/api/v1///').apiBaseUrl).toBe(
-      'http://localhost:3000/api/v1',
+    expect(parse('http://localhost:8000/api/v1///').apiBaseUrl).toBe(
+      'http://localhost:8000/api/v1',
     );
   });
 
@@ -18,13 +18,13 @@ describe('parseClientEnv', () => {
   });
 
   it('rejects base URLs without or with duplicated API path segments', () => {
-    expect(() => parse('http://localhost:3000')).toThrow('must end with /api/v1');
-    expect(() => parse('http://localhost:3000/api/v1/api/v1')).toThrow('only once');
+    expect(() => parse('http://localhost:8000')).toThrow('must end with /api/v1');
+    expect(() => parse('http://localhost:8000/api/v1/api/v1')).toThrow('only once');
   });
 
   it('rejects credentials, query strings, and non-http protocols', () => {
-    expect(() => parse('http://user:pass@localhost:3000/api/v1')).toThrow('credentials');
-    expect(() => parse('http://localhost:3000/api/v1?x=1')).toThrow('query string');
+    expect(() => parse('http://user:pass@localhost:8000/api/v1')).toThrow('credentials');
+    expect(() => parse('http://localhost:8000/api/v1?x=1')).toThrow('query string');
     expect(() => parse('ftp://localhost/api/v1')).toThrow('http or https');
   });
 
@@ -33,8 +33,8 @@ describe('parseClientEnv', () => {
     expect(parse('https://api.example.com/api/v1', true).apiBaseUrl).toBe(
       'https://api.example.com/api/v1',
     );
-    expect(parse('http://localhost:3000/api/v1', true).apiBaseUrl).toBe(
-      'http://localhost:3000/api/v1',
+    expect(parse('http://localhost:8000/api/v1', true).apiBaseUrl).toBe(
+      'http://localhost:8000/api/v1',
     );
   });
 });
