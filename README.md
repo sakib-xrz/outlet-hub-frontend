@@ -673,9 +673,11 @@ All HTTP traffic is mocked. `tests/setup.ts` replaces Axios's default adapter so
 
 ```bash
 pnpm exec playwright install chromium            # once
-# create a local disposable database, migrate it, and seed an HQ admin:
+# create a local disposable database, migrate it, and insert an HQ admin:
 #   (in ../backend) DATABASE_URL=<local-db> pnpm db:migrate:deploy
-#   (in ../backend) DATABASE_URL=<local-db> ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm db:seed:admin
+#   (in ../backend) node -e "require('argon2').hash(process.argv[1],{type:2}).then(console.log)" '<password>'
+#   psql <local-db> -c "INSERT INTO users (id, email, password_hash, role, updated_at)
+#     VALUES (gen_random_uuid(), '<email>', '<argon2id-hash>', 'HQ_ADMIN', now());"
 E2E_DATABASE_URL=<local-db> E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… pnpm test:e2e
 ```
 
@@ -685,7 +687,7 @@ Result: **4/4 passed**. Running these tests found a real defect: the backend COR
 
 Run this only with approval; it writes refresh sessions to the shared database.
 
-1. Start the backend and run `pnpm dev`. Seed an admin with the backend's `pnpm db:seed:admin`.
+1. Start the backend and run `pnpm dev`. Sign in with an existing HQ admin account.
 2. Open `http://localhost:5173/dashboard`. You should be redirected to `/login`.
 3. Submit an empty form, then a wrong password. Check the field errors and the generic "Invalid email or password." message.
 4. Sign in. You land on `/dashboard` and the account card shows your email and role.
